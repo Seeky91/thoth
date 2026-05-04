@@ -1,6 +1,6 @@
 ---
 name: maintainability
-description: Run a scoped maintainability audit on a project, manage findings with stable IDs, rotate audited zones across audits to maximize coverage. Use this skill whenever the user invokes `/maintainability`, asks for a maintainability audit, asks to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments, asks to list or update or double-check existing maintainability findings, or asks for a structured review of code health in a specific module. The skill manages per-project state files (.claude/maintainability_history.md and .claude/maintainability_findings.md) autonomously.
+description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline.
 ---
 
 # Maintainability skill
@@ -44,7 +44,7 @@ Déclenché par `/maintainability` (auto) ou `/maintainability <path>` (forcé).
 
 1. Si `.claude/` n'existe pas dans le projet : créer le dossier.
 2. Si `maintainability_history.md` absent : créer avec `# Maintainability audit history\n\n` (rien d'autre).
-3. Si `maintainability_findings.md` absent : créer avec `# Maintainability findings\n\n## Pending\n\n## Resolved\n`.
+3. Si `maintainability_findings.md` absent : créer avec `# Maintainability findings\n\n## Pending\n\n## Resolved\n`. Pas de header `<!-- id_counters: ... -->` à ce stade (création paresseuse à la première assignation d'ID). Pas non plus de `maintainability_resolved_archive.md` (création paresseuse au 11e résolu).
 4. Annoncer en chat : *"Bootstrap maintainability sur ce projet, aucun historique préalable."*
 5. Continuer le flux d'audit normalement (pas de rolling à respecter).
 
@@ -55,9 +55,9 @@ Calculer à chaque audit (jamais persisté). Algorithme :
 1. **Walk de l'arbo** depuis la racine du projet.
 2. **Pour chaque dossier**, mesurer le total LoC source (exclure `.json`, `.toml`, `.lock`, `.md`, dossiers `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, et tout ce qui ressemble à du généré).
 3. **Règles de découpage** :
-   - Dossier 200–2000 LoC → zone candidate.
-   - Dossier > 2000 LoC → descendre dans ses sous-dossiers, appliquer la règle récursivement.
-   - Dossier < 200 LoC → grouper avec son parent (ne pas le proposer seul).
+  - Dossier 200–2000 LoC → zone candidate.
+  - Dossier > 2000 LoC → descendre dans ses sous-dossiers, appliquer la règle récursivement.
+  - Dossier < 200 LoC → grouper avec son parent (ne pas le proposer seul).
 4. **Fichiers ≥ 600 LoC source** (peu importe leur dossier) → zone autonome additionnelle. Chasse les god files même quand ils sont noyés dans un dossier raisonnable.
 5. **Mesure LoC source** : compter les lignes non vides hors lignes-commentaires pures. Approximation acceptable, pas besoin d'AST.
 6. **Pipelines candidats** : si en parcourant l'arbo le skill identifie un flux de données traçable (un point d'entrée qui appelle 3-5 fichiers en chaîne), il peut le proposer comme zone `pipeline:<nom>` avec la liste explicite des fichiers. Si le skill n'arrive pas à nommer le pipeline et ses fichiers concrètement, il **n'inclut pas** de pipeline dans les candidats — on n'invente pas de pipeline pour cocher la case.
@@ -70,14 +70,14 @@ Calculer à chaque audit (jamais persisté). Algorithme :
 2. Calculer `N = clamp(round(Z / 4), 3, 8)` (override possible via `<!-- rolling_size: M -->` en tête de history, voir *Format des fichiers projet*).
 3. **Candidats** = `inventaire - rolling` (les `N` derniers).
 4. **Pondération** :
-   - Zones jamais auditées (n'apparaissant dans aucune ligne du history actuel) → priorité haute.
-   - Sinon, sélection aléatoire pondérée parmi les candidats restants.
+  - Zones jamais auditées (n'apparaissant dans aucune ligne du history actuel) → priorité haute.
+  - Sinon, sélection aléatoire pondérée parmi les candidats restants.
 5. **Visée pipeline ~30%** : si des candidats `pipeline:` existent et qu'on n'a pas audité de pipeline récemment (rolling), augmenter leur pondération pour atteindre approximativement 30% des audits sur la durée.
 6. **Annonce en chat** :
-   ```
-   Je propose : services/billing/refund/ (jamais auditée, ~800 LoC)
-   Alternatives : core/api_handler.py (god file, 1842 LoC) ou pipeline:order-processing [api/ingest.py, validators/order.py, enrichers/customer.py, store/orders.py]
-   ```
+  ```
+  Je propose : services/billing/refund/ (jamais auditée, ~800 LoC)
+  Alternatives : core/api_handler.py (god file, 1842 LoC) ou pipeline:order-processing [api/ingest.py, validators/order.py, enrichers/customer.py, store/orders.py]
+  ```
 7. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
 
 #### Cas dégénérés de la sélection
@@ -99,9 +99,9 @@ Pour la zone validée :
 
 1. **Lire le code de la zone** intégralement (tous les fichiers source dans le scope).
 2. **Examiner systématiquement toutes les dimensions** du catalogue. Pour chacune :
-   - Chercher des occurrences concrètes du pattern dans la zone.
-   - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition selon la grille), **estimer le Δ LoC** que produirait l'application de la reco (négatif si la reco supprime du code, positif si elle en ajoute, format `~±N`). Voir section *Estimation Δ LoC*.
-   - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
+  - Chercher des occurrences concrètes du pattern dans la zone.
+  - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition selon la grille), **estimer le Δ LoC** que produirait l'application de la reco (négatif si la reco supprime du code, positif si elle en ajoute, format `~±N`). Voir section *Estimation Δ LoC*.
+  - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
 3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres. Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
 4. **Assignation des IDs** : pour chaque finding nouveau, scanner le findings file, max existant pour le préfixe → incrément. Format à 3 chiffres (`DUP-007`).
 
@@ -109,9 +109,9 @@ Pour la zone validée :
 
 1. **Append des findings** dans `## Pending` de `maintainability_findings.md`. Format strict (voir section *Format des fichiers projet*).
 2. **Préfixer une nouvelle ligne en tête** de `maintainability_history.md` :
-   ```
-   - YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (pending)
-   ```
+  ```
+  - YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (pending)
+  ```
 3. **Trim** : recalculer la taille rolling et supprimer les lignes en surplus du bas.
 
 #### Cas zone propre (0 findings)
@@ -243,18 +243,20 @@ Déclenché par `/maintainability update`. **Pas d'audit nouveau.** Re-vérifie 
 
 1. Lire `maintainability_findings.md`. Itérer sur chaque entrée de la section `## Pending`.
 2. Pour chaque finding :
-   a. Lire le fichier référencé en localisation.
-   b. **Si le fichier est introuvable** (déplacé, supprimé, renommé) : marquer `Status: stale`, ne pas conclure résolu/pending. **Ne pas tenter de re-locater automatiquement** (risque de faux positif sur un fichier au nom voisin). Noter la situation.
-   c. **Si le fichier existe** : vérifier que le pattern décrit dans l'observation est toujours présent à la localisation indiquée (ou nearby si les lignes ont bougé). Heuristique :
-      - Lire les ~20 lignes autour de la localisation.
-      - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
-      - Si le pattern a disparu → bascule en Resolved.
+  a. Lire le fichier référencé en localisation.
+  b. **Si le fichier est introuvable** (déplacé, supprimé, renommé) : marquer `Status: stale`, ne pas conclure résolu/pending. **Ne pas tenter de re-locater automatiquement** (risque de faux positif sur un fichier au nom voisin). Noter la situation.
+  c. **Si le fichier existe** : vérifier que le pattern décrit dans l'observation est toujours présent à la localisation indiquée (ou nearby si les lignes ont bougé). Heuristique :
+    - Lire les ~20 lignes autour de la localisation.
+    - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
+    - Si le pattern a disparu → bascule en Resolved.
 3. Pour chaque résolu détecté :
-   - Déplacer l'entrée de `## Pending` vers `## Resolved`.
-   - Ajouter `(résolu YYYY-MM-DD)` au titre.
-   - Ajouter bullet `Resolution: détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (mesurer via `git log --since=<date détectée> -- <fichier>` ou comparaison directe avec l'estimation initiale ; si non mesurable, noter `Δ LoC mesuré : indéterminé`).
-   - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
+  - Déplacer l'entrée de `## Pending` vers `## Resolved`.
+  - Ajouter `(résolu YYYY-MM-DD)` au titre.
+  - Ajouter bullet `Resolution: détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (mesurer via `git log --since=<date détectée> -- <fichier>` ou comparaison directe avec l'estimation initiale ; si non mesurable, noter `Δ LoC mesuré : indéterminé`).
+  - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
 4. Pour chaque stale : laisser dans Pending mais ajouter `Status: stale (YYYY-MM-DD) — fichier introuvable, à rouvrir manuellement avec nouveau path ou archiver`. Demander à l'utilisateur en chat : *"M-XX référence un fichier introuvable. Rouvrir avec nouveau path ou archiver ?"*
+5. **Vérification de l'invariant `Resolved ≤ 10`** : compter les entrées de la section `## Resolved` après les moves de l'étape 3. Si > 10 (cas migration depuis un état pré-archive ou édition manuelle), appliquer le flux d'archivage automatique (cf. *Cycle de vie d'un finding* étape 5) pour ramener à 10.
+6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->` du fichier findings (le créer s'il est absent). Self-heal contre drift (édition manuelle, bug du skill). C'est le seul moment où le skill lit l'archive — coût acceptable car `update` est rare et explicite.
 
 ### Sortie en chat
 
@@ -265,8 +267,9 @@ Re-vérifié 8 pendings :
   Résolus (2) : DUP-005, CPX-008
   Toujours présents (5) : DUP-007, SIZ-003, INC-002, TST-001, DRF-002
   Stale (1) : CFG-003 (config/flags.toml introuvable, déplacé ?)
+  Archivés (3) : DUP-001, DUP-002, INC-001 (cap Resolved=10 atteint)
 
-Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md
+Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md, .claude/maintainability_resolved_archive.md
 ```
 
 ### Coût
@@ -291,13 +294,13 @@ Déclenché par `/maintainability double-check <ID>` (ex. `/maintainability doub
 1. **Localiser le finding** : scanner `maintainability_findings.md`, trouver l'entrée `### <ID> — …`. Si absent → demander à l'utilisateur un ID valide (ne pas inventer).
 2. **Lire le fichier référencé** intégralement, plus les fichiers voisins / importeurs.
 3. **Trace** :
-   - **Localisation complète** : tous les call sites, imports, références au symbole/pattern concerné.
-   - **Blast radius** : tests qui touchent la zone, surfaces publiques affectées, couplages cachés (ce qui casse si on applique le fix proposé).
-   - **Faisabilité de la reco initiale** : tient-elle ? Y a-t-il une contrainte (typage, signature publique, dépendance circulaire, contrat externe) qui invaliderait la reco ?
-   - **Effort estimé** : `S` (≤2h), `M` (≤1j), `L` (>1j, plusieurs commits). Distinct de la faisabilité.
-   - **Δ LoC affiné** : ré-estimer à la lumière du blast radius et des contraintes. Si l'écart avec l'estimation initiale est > 50 %, expliquer brièvement pourquoi.
-   - **Reco affinée** : ajustée à la lumière des contraintes découvertes, ou alternatives si l'originale ne tient plus.
-   - **Verdict** : GO / NO-GO / GO-mais-après-X.
+  - **Localisation complète** : tous les call sites, imports, références au symbole/pattern concerné.
+  - **Blast radius** : tests qui touchent la zone, surfaces publiques affectées, couplages cachés (ce qui casse si on applique le fix proposé).
+  - **Faisabilité de la reco initiale** : tient-elle ? Y a-t-il une contrainte (typage, signature publique, dépendance circulaire, contrat externe) qui invaliderait la reco ?
+  - **Effort estimé** : `S` (≤2h), `M` (≤1j), `L` (>1j, plusieurs commits). Distinct de la faisabilité.
+  - **Δ LoC affiné** : ré-estimer à la lumière du blast radius et des contraintes. Si l'écart avec l'estimation initiale est > 50 %, expliquer brièvement pourquoi.
+  - **Reco affinée** : ajustée à la lumière des contraintes découvertes, ou alternatives si l'originale ne tient plus.
+  - **Verdict** : GO / NO-GO / GO-mais-après-X.
 4. **Possibilité de reclasser la sévérité** : si l'analyse montre que HIGH était excessif (effort L mais impact en réalité MED), proposer le changement à l'utilisateur. **Ne pas changer l'ID.**
 
 ### Écriture dans le fichier findings
@@ -442,10 +445,12 @@ Règles :
 
 ### `.claude/maintainability_findings.md`
 
-Source de vérité. Findings groupés en deux sections.
+Source de vérité. Findings groupés en deux sections, plus un header de compteurs d'IDs.
 
 ```markdown
 # Maintainability findings
+
+<!-- id_counters: DUP=7, SIZ=3, CPX=2, INC=2, DOC=1 -->
 
 ## Pending
 
@@ -481,34 +486,76 @@ Règles :
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
 - Bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check, Resolution).
 - L'ID est immuable. Tout autre attribut peut être amendé.
+- Le header `<!-- id_counters: PREFIX=N, ... -->` cache les compteurs d'IDs pour assignation rapide (cf. *Compteur d'IDs*). Absent dans un fichier fraîchement bootstrappé ; ajouté à la première assignation d'ID.
+- La section `## Resolved` est cappée à **10 entrées** ; les plus anciennes sont déplacées vers `maintainability_resolved_archive.md` automatiquement (cf. *Cycle de vie d'un finding* étape 5).
 
-### Compteur d'IDs (implicite)
+### `.claude/maintainability_resolved_archive.md`
 
-Pour assigner un nouvel ID `<PREFIX>-NNN` : scanner le fichier findings, repérer le max `N` existant pour ce préfixe, incrémenter. Format à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042` reste lisible).
+Cold storage pour les entrées de `## Resolved` qui débordent du cap à 10. **Jamais lu par défaut** : le skill ne le charge que pendant `update` (recompute des compteurs d'IDs). Création paresseuse au premier débordement.
 
-**Jamais de réutilisation d'ID**, même après suppression manuelle d'une entrée par l'utilisateur. Si max trouvé = `DUP-005` mais l'utilisateur a supprimé `DUP-005`, le prochain est `DUP-006` (pas `DUP-005`).
+```markdown
+# Maintainability resolved archive
+
+### DUP-001 — MED — services/auth/login.py:23 (résolu 2026-04-16)
+- **Dimension :** duplication de code
+- **Observation :** Validation token dupliquée avec `services/auth/refresh.py:18`.
+- **Reco :** Helper `_validate_token()`.
+- **Δ LoC :** ~-25 (estimation initiale).
+- **Resolution :** Extrait vers `services/auth/_helpers.py`. Δ LoC mesuré : -32.
+
+### CPX-002 — HIGH — core/api_handler.py:88 (résolu 2026-04-22)
+- ...
+```
+
+Règles :
+- Pas de section `## Pending` / `## Resolved` (le fichier entier est l'équivalent d'un `## Resolved` géant).
+- Entrées au format strict identique à celles de `## Resolved` du fichier findings (titre + bullets, déplacées intactes — pas de compaction).
+- Append-only en fin de fichier (l'ordre = ordre chronologique des résolutions, du plus ancien au plus récent).
+- Les IDs des entrées archivées restent référencés dans `maintainability_history.md` (lignes `(résolus DUP-001+...)`) — pas de mise à jour à faire dans history lors de l'archivage.
+- Lecture explicite uniquement par l'utilisateur (`grep`, ouverture éditeur, ou demande conversationnelle "regarde l'archive et …"). Pas de mode dédié dans le skill.
+
+### Compteur d'IDs (header cached)
+
+Le fichier `maintainability_findings.md` porte un header en commentaire HTML qui cache le max assigné par préfixe :
+
+```markdown
+<!-- id_counters: DUP=12, CPX=8, SIZ=5, INC=4, DRF=2, BND=1, TST=2, DOC=4, DED=4, CFG=1 -->
+```
+
+**Assignation d'un nouvel ID** : lire le compteur pour le préfixe dans le header, incrémenter, écrire le finding avec ce nouvel ID, mettre à jour la ligne header. Coût trivial : le header est déjà chargé, pas besoin de scanner l'archive ni même la totalité du fichier findings.
+
+**Préfixe inédit** (premier finding d'une nouvelle dimension comme `LOG-`, `RAC-`, ou autre invention) : ajouter `<PREFIX>=1` au header.
+
+**Header absent** (cas migration depuis un état pré-archive, ou édition manuelle qui l'a viré) : scan one-shot de `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), calcul des max par préfixe, écriture du header. Coût ponctuel, jamais répété ensuite.
+
+**Self-healing** : à chaque `update`, recompute des compteurs en re-scannant les deux fichiers (cf. *Mode : update > Flux* étape 6). Seul moment où le skill lit l'archive — coût acceptable car `update` est rare et explicite.
+
+Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042` reste lisible).
+
+**Jamais de réutilisation d'ID**, même après suppression manuelle d'une entrée par l'utilisateur, et même après archivage. Le compteur monte monotonement. Si max trouvé = `DUP-005` mais l'utilisateur a supprimé `DUP-005`, le prochain est `DUP-006` (pas `DUP-005`).
 
 ## Cycle de vie d'un finding
 
 1. **Création** lors d'un audit → entrée `## Pending` avec ID, dimension, sévérité, observation, reco, date, `Status: pending`.
 2. **Double-check** (`/maintainability double-check <ID>`) → ajoute une section `Double-check (date)` dans l'entrée existante. Peut amender la reco. Peut révéler un changement de sévérité (proposer à l'utilisateur, valider, puis amender l'attribut).
 3. **Résolution intra-session** → quand l'utilisateur applique un fix dans la conversation qui suit un audit ou un double-check, le skill **propose** de marquer résolu :
-   - Déplace l'entrée en `## Resolved`
-   - Ajoute `(résolu YYYY-MM-DD)` dans le titre
-   - Ajoute bullet `Resolution: <description courte du fix>. Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` sur la zone du fix, ou comptage direct sur les fichiers touchés). Si le fix est dans le même tour de conversation : faire la mesure tout de suite.
-   - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix
+  - Déplace l'entrée en `## Resolved`
+  - Ajoute `(résolu YYYY-MM-DD)` dans le titre
+  - Ajoute bullet `Resolution: <description courte du fix>. Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` sur la zone du fix, ou comptage direct sur les fichiers touchés). Si le fix est dans le même tour de conversation : faire la mesure tout de suite.
+  - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix
 4. **Update** (`/maintainability update`) → re-vérifie chaque pending :
-   - Pattern toujours présent → status inchangé.
-   - Pattern absent → `Resolution: détecté résolu lors de update (YYYY-MM-DD)`. Bascule en Resolved.
-   - Fichier disparu / déplacé → `Status: stale`. Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, ou archiver).
+  - Pattern toujours présent → status inchangé.
+  - Pattern absent → `Resolution: détecté résolu lors de update (YYYY-MM-DD)`. Bascule en Resolved.
+  - Fichier disparu / déplacé → `Status: stale`. Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, ou archiver).
+5. **Archivage automatique** → après chaque move vers `## Resolved` (étapes 3, 4, ou *Cas NO-GO en autonomie* du mode audit) :
+  - Compter les entrées de la section `## Resolved` du fichier findings.
+  - Si > 10 : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte à 10. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).
+  - Si l'archive n'existe pas, la créer à la volée avec le header `# Maintainability resolved archive\n\n` puis appender l'entrée.
+  - Append en fin d'archive (l'ordre d'archivage = ordre chronologique des résolutions).
+  - L'entrée est déplacée intacte (pas de compaction du contenu).
+  - Le header `<!-- id_counters: ... -->` du fichier findings n'est pas affecté (les IDs restent monotonement croissants ; cf. *Compteur d'IDs*).
 
-## Bootstrap & edge cases
-
-### Bootstrap (premier audit)
-Voir Mode : audit > A. Bootstrap. En résumé : créer `.claude/` et les deux fichiers vides avec headers, annoncer le bootstrap, continuer le flux.
-
-### Override rolling_size
-Voir *Format des fichiers projet > maintainability_history.md* pour la règle canonique.
+## Edge cases
 
 ### Reclassification
 Si un finding s'avère mal catégorisé (e.g. `DUP-007` est en réalité un problème de complexité, pas de duplication) :
@@ -516,14 +563,8 @@ Si un finding s'avère mal catégorisé (e.g. `DUP-007` est en réalité un prob
 - Ajouter une bullet `Note: Reclassifié sémantiquement vers CPX, ID conservé pour traçabilité`.
 - Optionnel : ajuster la dimension dans la bullet `Dimension`.
 
-### Scope refusé (>5000 LoC)
-Sur `/maintainability <path>`, si la zone agrège plus de 5000 LoC source :
-- Ne pas lancer l'audit.
-- Annoncer : *"Zone trop large (XYZ LoC). Pour une analyse profonde, je propose de découper. Sous-scopes possibles : <path>/A, <path>/B, …"*
-- Demander confirmation. Si l'utilisateur insiste, lancer en avertissant que l'audit sera moins profond.
-
 ### Fichier déplacé / refactoré entre audits
-Voir *Mode : update > Flux* (étape 2.b et étape 4) pour le flux canonique de gestion des stale. S'applique aussi en `double-check` quand l'ID référencé pointe vers un fichier disparu.
+La logique stale de *Mode : update > Flux* (étape 2.b et étape 4) s'applique aussi en `double-check` quand l'ID référencé pointe vers un fichier disparu.
 
 ### Doublons potentiels
 Si un audit produit un finding qui ressemble fortement à un finding pending existant (même fichier, même pattern) :

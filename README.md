@@ -19,11 +19,14 @@ Permet de détecter et suivre la dette de maintenabilité dans le temps sans rep
 
 ## Installation
 
-Copier le dossier `.claude/` du skill souhaité à la racine de votre projet :
+Depuis la racine de ce dépôt, copier les fichiers dans votre dossier Claude :
 
 ```bash
-cp -r skills/maintainability/.claude .claude
-```
+mkdir -p ~/.claude/skills/maintainability ~/.claude/commands
+
+cp .claude/skills/maintainability/SKILL.md ~/.claude/skills/maintainability/
+cp .claude/commands/maintainability.md ~/.claude/commands/
+````
 
 ---
 
@@ -98,10 +101,11 @@ Le skill `maintainability` expose une commande principale :
 
 ## Fichiers générés
 
-Le skill maintient automatiquement deux fichiers dans votre projet :
+Le skill maintient automatiquement plusieurs fichiers dans votre projet :
 
 * `.claude/maintainability_history.md` — historique des audits
-* `.claude/maintainability_findings.md` — liste des problèmes détectés
+* `.claude/maintainability_findings.md` — liste des problèmes détectés (pending + resolved récents)
+* `.claude/maintainability_resolved_archive.md` — archive des anciens findings résolus (au-delà de la limite de rétention)
 
 ---
 
