@@ -12,6 +12,7 @@ Audit de maintenabilité ciblé avec :
 * état persistant par projet (`.claude/`)
 * rotation automatique des zones auditées (rolling coverage)
 * re-vérification et approfondissement des problèmes
+* re-vérification en cascade automatique après chaque fix (les findings dont la localisation chevauche le diff sont rechecké, marqués résolus collatéralement, ou taggés `stale-after`)
 
 Permet de détecter et suivre la dette de maintenabilité dans le temps sans repasser toujours sur les mêmes zones.
 
@@ -78,7 +79,7 @@ Le skill `maintainability` expose une famille de slash commands, une par mode. C
 
 * Re-vérifie tous les findings `pending`
 * Marque ceux qui sont résolus
-* Détecte les fichiers déplacés (`stale`)
+* Détecte les fichiers déplacés (`stale` ou `stale-after-<ID>` si déjà tagué par la cascade)
 
 ---
 

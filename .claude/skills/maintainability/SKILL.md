@@ -215,9 +215,10 @@ Déclenché par `/maintainability-list`. **Pas d'audit, pas de re-vérification,
 
 1. Lire `maintainability_findings.md` et `maintainability_history.md`.
 2. Compter les pending par sévérité. Lister les IDs avec un one-liner descriptif (extrait de l'observation, ~50 chars).
-3. Lister les résolus des 30 derniers jours (filtrer par la date dans le titre Resolved).
-4. Lister les entrées du rolling (taille `N` actuelle).
-5. Détecter les batches groupables parmi les pending (cf. *Batches suggérés*).
+3. **Compter et lister à part les findings stale** (pending dont la bullet `Status` est `stale ...` ou `stale-after-<ID> ...`) — distincts des actifs car ils nécessitent une action utilisateur (relocaliser, marquer résolu, ou archiver) avant de pouvoir être traités. Ils restent inclus dans le total Pending.
+4. Lister les résolus des 30 derniers jours (filtrer par la date dans le titre Resolved).
+5. Lister les entrées du rolling (taille `N` actuelle).
+6. Détecter les batches groupables parmi les pending **actifs uniquement** (les stale sont exclus du batching, cf. *Batches suggérés*).
 
 ### Sortie type
 
@@ -228,6 +229,10 @@ Pending (8) :
   HIGH (3) : DUP-007 (duplication refund), SIZ-003 (god file api_handler), INC-002 (3 patterns paginate)
   MED  (4) : CPX-005, TST-001, DRF-002, CFG-003
   LOW  (1) : DOC-006
+
+Stale (2) — à relocaliser, marquer résolu, ou archiver :
+  CFG-003 — stale-after-SIZ-009 (fix du 2026-05-04, localisation invalidée)
+  TST-005 — stale (config/flags.toml introuvable, update du 2026-04-22)
 
 Recently resolved (30 derniers j.) :
   DUP-005 (MED) — 2026-04-16 — extraction _validate_token
@@ -251,7 +256,8 @@ Je propose `double-check B1` (recommandé).
 Sinon : `fix B1` direct, un autre batch (`double-check B2` / `fix B2`), ou `rien`.
 ```
 
-Si zéro pending : afficher `Pending (0) : aucun finding actif.`
+Si zéro pending actif (peut-être stale) : afficher `Pending actifs (0) : aucun finding actionnable.` La section Stale reste affichée si non vide.
+Si zéro stale : omettre entièrement la section Stale (ne pas afficher `Stale (0)`).
 Si zéro audit : afficher `Aucun audit dans l'historique. Lance /maintainability pour commencer.`
 
 ### Batches suggérés
@@ -303,7 +309,8 @@ L'utilisateur répond en texte libre.
   1. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée` si présente, sinon `Reco`.
   2. Afficher le plan global, demander un OK explicite. Si OK, exécuter dans l'ordre.
   3. **Avant** chaque marquage `Resolution`, lancer la suite de tests (détectée via marqueurs : `cargo test`, `npm test`, `pytest`, `go test ./...`, etc. ; sinon demander la commande). Tests OK → flux résolution intra-session (move + compaction, cf. *Cycle de vie*). Tests KO → arrêt, ne pas marquer, annoncer ; pas de revert auto.
-  4. Récap final : *"X/Y résolus, Δ LoC total mesuré : ..., commits : ..."*.
+  4. **Cascade re-check** automatique après chaque résolution du batch (cf. *Re-vérification en cascade*) — sans nouveau prompt puisque l'OK plan global de l'étape 2 couvre. Cascadés et stale-after sont agrégés. Si la cascade résout un item ultérieur du batch : skip cet item avec annonce *"<ID> déjà résolu collatéralement par <ID-primaire>, skip."*
+  5. Récap final : *"X/Y résolus, Δ LoC total mesuré : ..., commits : ... ; cascade : N résolus collatéralement, M stale-after"* (la ligne cascade est omise si overlap zéro sur tous les fixes du batch).
 - **`rien`** : terminer sans rien faire.
 
 **Cas dégénérés** : batch ID invalide ("B5" alors que seuls B1/B2 listés) → demander relance de `list`. Finding déjà résolu entre `list` et action → skip avec annonce.
@@ -321,7 +328,9 @@ Déclenché par `/maintainability-update`. **Pas d'audit nouveau.** Re-vérifie 
 1. Lire `maintainability_findings.md`. Itérer sur chaque entrée de la section `## Pending`.
 2. Pour chaque finding :
   a. Lire le fichier référencé en localisation.
-  b. **Si le fichier est introuvable** (déplacé, supprimé, renommé) : marquer `Status: stale`, ne pas conclure résolu/pending. **Ne pas tenter de re-locater automatiquement** (risque de faux positif sur un fichier au nom voisin). Noter la situation.
+  b. **Si le fichier est introuvable** (déplacé, supprimé, renommé) :
+    - Si `Status: stale-after-<ID>` est déjà présent (posé par la cascade) : laisser tel quel, ne pas le remplacer par un `stale` générique — l'info de cause est plus précieuse.
+    - Sinon : marquer `Status: stale`, ne pas conclure résolu/pending. **Ne pas tenter de re-locater automatiquement** (risque de faux positif sur un fichier au nom voisin). Noter la situation.
   c. **Si le fichier existe** : vérifier que le pattern décrit dans l'observation est toujours présent à la localisation indiquée (ou nearby si les lignes ont bougé). Heuristique :
     - Lire les ~20 lignes autour de la localisation.
     - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
@@ -331,7 +340,9 @@ Déclenché par `/maintainability-update`. **Pas d'audit nouveau.** Re-vérifie 
   - Ajouter `(résolu YYYY-MM-DD)` au titre.
   - La bullet `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (via `git log --since=<date> -- <fichier>` ou comparaison directe ; sinon `indéterminé`). Ajouter `Commit : <hash>` si un commit aval est identifiable.
   - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
-4. Pour chaque stale : laisser dans Pending mais ajouter `Status: stale (YYYY-MM-DD) — fichier introuvable, à rouvrir manuellement avec nouveau path ou archiver`. Demander à l'utilisateur en chat : *"M-XX référence un fichier introuvable. Rouvrir avec nouveau path ou archiver ?"*
+4. Pour chaque stale (générique ou `stale-after-<ID>` posé par la cascade) : laisser dans Pending. Le `Status` a déjà été ajusté à l'étape 2.b. Demander à l'utilisateur en chat — message adapté à la cause :
+  - Stale générique : *"`<ID>` référence un fichier introuvable. Rouvrir avec nouveau path, marquer résolu (le pattern n'existe plus), ou archiver ?"*
+  - Stale-after : *"`<ID>` est `stale-after-<ID-primaire>` depuis le fix du <YYYY-MM-DD>. Localisation invalidée par le fix. Rouvrir avec nouveau path, marquer résolu, ou archiver ?"*
 5. **Vérification de l'invariant cap Resolved** : compter les entrées de la section `## Resolved` après les moves de l'étape 3. Si > cap (cf. *Format des fichiers projet > maintainability_findings.md*), appliquer le flux d'archivage automatique (cf. *Cycle de vie d'un finding* étape 5) pour ramener au cap.
 6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->` du fichier findings (le créer s'il est absent). Self-heal contre drift (édition manuelle, bug du skill). Le skill lit l'archive ici et dans `archive-clear` uniquement — coût acceptable car les deux opérations sont rares et explicites.
 
@@ -342,8 +353,9 @@ Update terminé — services/example-project/
 
 Re-vérifié 8 pendings :
   Résolus (2) : DUP-005, CPX-008
-  Toujours présents (5) : DUP-007, SIZ-003, INC-002, TST-001, DRF-002
+  Toujours présents (4) : DUP-007, SIZ-003, INC-002, TST-001
   Stale (1) : CFG-003 (config/flags.toml introuvable, déplacé ?)
+  Stale-after (1) : DRF-002 (stale-after-SIZ-009 préservé, pas écrasé)
   Archivés (3) : DUP-001, DUP-002, INC-001 (cap Resolved atteint)
 
 Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md, .claude/maintainability_resolved_archive.md
@@ -580,7 +592,7 @@ Source de vérité. Findings groupés en deux sections, plus un header de compte
 Règles :
 - En-tête entrée : `### <ID> — <SÉVÉRITÉ> — <localisation>` (avec `(résolu YYYY-MM-DD)` ajouté pour les Resolved).
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
-- **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check).
+- **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check). Valeurs de `Status` : `pending` (initial), `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable, cf. *Mode : update > Flux* étape 2.b), `stale-after-<ID> (YYYY-MM-DD) — <raison>` (posé par la cascade quand le fix de `<ID>` invalide la localisation, cf. *Re-vérification en cascade*).
 - **Resolved** — format compact à 3 bullets : Dimension, Resolution, Audit origin. Voir *Format compact d'une entrée résolue* ci-dessous.
 - L'ID est immuable. Tout autre attribut peut être amendé.
 - Le header `<!-- id_counters: PREFIX=N, ... -->` cache les compteurs d'IDs pour assignation rapide (cf. *Compteur d'IDs*). Absent dans un fichier fraîchement bootstrappé ; ajouté à la première assignation d'ID.
@@ -657,10 +669,11 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
   - Ajoute `(résolu YYYY-MM-DD)` dans le titre.
   - La bullet `Resolution` contient : description courte du fix + `Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` ou comptage direct ; faire la mesure dans le tour de conversation si possible) + `Commit : <hash>` du commit qui applique le fix.
   - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix.
+  - **Déclenche la re-vérification en cascade** sur les pendings dont la localisation chevauche le diff du fix (cf. *Re-vérification en cascade*). Le résultat est intégré dans le **même prompt** de confirmation primaire — l'utilisateur valide l'ensemble (primaire + cascadés + stale-after) en un mot.
 4. **Update** (`/maintainability-update`) → re-vérifie chaque pending :
   - Pattern toujours présent → status inchangé.
   - Pattern absent → bascule en Resolved au format compact (cf. étape 3) ; `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD)` + Δ mesuré + `Commit : <hash>` si identifiable via `git log`.
-  - Fichier disparu / déplacé → `Status: stale`. Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, ou archiver).
+  - Fichier disparu / déplacé → `Status: stale` (sauf si `stale-after-<ID>` est déjà posé par la cascade : préservé, pas écrasé). Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, marquer résolu, ou archiver).
 5. **Archivage automatique** → après chaque move vers `## Resolved` (étapes 3, 4, ou *Cas NO-GO en autonomie* du mode audit) :
   - Compter les entrées de la section `## Resolved` du fichier findings.
   - Si > cap (cf. *Format des fichiers projet > maintainability_findings.md*) : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte au cap. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).
@@ -668,6 +681,71 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
   - Append en fin d'archive (l'ordre d'archivage = ordre chronologique des résolutions).
   - L'entrée est déplacée intacte (la compaction a déjà eu lieu au move vers `## Resolved`).
   - Le header `<!-- id_counters: ... -->` du fichier findings n'est pas affecté (les IDs restent monotonement croissants ; cf. *Compteur d'IDs*).
+
+## Re-vérification en cascade
+
+Sous-processus déclenché automatiquement après chaque move Pending → Resolved **lié à un fix** (intra-session, `fix B<n>` depuis list). But : détecter et tenir à jour les findings dont la localisation chevauche le diff du fix sans relancer un `update` complet. Les moves NO-GO (pas de fix, pas de diff) et les résolutions issues de `update` (déjà exhaustif par construction) ne déclenchent **pas** de cascade.
+
+### Algorithme
+
+1. **Capter le diff** : `git show --name-only <hash>` où `<hash>` est le commit de la `Resolution` du finding primaire. Pour des fixes batchés (plusieurs primaires dans le même turn) : union des paths sur tous les commits associés. Si pas de commit identifiable (cas rare où le fix n'est pas committé au moment de la résolution) : sauter la cascade et noter en chat *"Cascade re-check sautée : pas de commit identifié pour `<ID>`."*
+
+2. **Filtrer les candidats** parmi `## Pending`, hors les primaires déjà déplacés. Un finding est candidat ssi son path :
+  - matche exactement un path du diff, ou
+  - est descendant d'un dossier du diff, ou
+  - est ancêtre d'un path du diff (cas god file dont le contenu est splitté en sous-fichiers).
+  
+  **Si zéro candidat** : sortie silencieuse, aucune écriture, aucun message en chat.
+
+3. **Re-check par candidat** — réutilise la logique par-dimension de *Mode : update > Flux* étape 2c. Trois issues possibles :
+  - **Pattern toujours présent** → laisser pending. Si la ligne a shifté significativement, mettre à jour `path:line` dans le titre. Pas d'autre écriture.
+  - **Pattern absent** (fichier toujours là, observation ne tient plus) → cascade-resolved. Move vers `## Resolved` au format compact (cf. *Format compact d'une entrée résolue*). Bullet `Resolution :` au format : *"résolu collatéralement par fix de `<ID-primaire>` (YYYY-MM-DD). Δ LoC mesuré : intégré dans `<ID-primaire>`. Commit : `<hash-primaire>`."* — pas de fragmentation du Δ, la valeur globale reste dans la `Resolution` du primaire ; le commit est celui du primaire (le cascadé n'a pas son propre commit).
+  - **Fichier disparu / renommé** (path absent du repo après le fix) → laisser en pending et **remplacer** la bullet `Status` par `Status : stale-after-<ID-primaire> (YYYY-MM-DD) — localisation invalidée par le fix, à relocaliser ou archiver`. Pas de question synchrone.
+
+4. **Mettre à jour `maintainability_history.md`** : pour chaque cascade-resolved, retrouver la zone et la date de l'audit d'origine via la bullet `Détecté` de l'entrée Pending (lue **avant** le move qui la drop) et compléter `(résolus <IDs>+...)` sur la ligne d'audit correspondante.
+
+5. **Appliquer l'invariant cap Resolved** (cf. *Cycle de vie d'un finding* étape 5).
+
+### Confirmation utilisateur (flux intra-session)
+
+Le flux intra-session existant (*"Ce fix résout DUP-007. Je marque comme résolu ?"*, cf. *Mode : update > Détection intra-session*) est étendu : la cascade s'exécute en lecture seule **avant** le prompt, et son résultat est inclus dans le **même prompt** que la confirmation primaire :
+
+```
+Ce fix résout DUP-007 (Δ -32). Cascade re-check sur 3 pendings touchant les mêmes fichiers :
+  - INC-008 — pattern absent → résolu collatéralement
+  - DOC-011 — pattern toujours présent (l. 42 → 38, à mettre à jour)
+  - TST-005 — tests/refund_test.py renommé → stale-after-DUP-007
+
+Je marque DUP-007 + INC-008 résolus, mets à jour DOC-011, et tag TST-005 stale-after ?
+```
+
+L'utilisateur valide tout en un mot. Si push-back partiel (*"garde INC-008 en pending"*) : appliquer le reste, ne pas insister.
+
+### Sortie en chat (flux pré-validés)
+
+Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La cascade s'exécute alors **sans nouveau prompt** ; son résultat agrégé est intégré au récap final :
+
+```
+3/3 résolus, Δ LoC total mesuré : -47, commits : a7b3+c812+d934.
+Cascade re-check : 1 résolu collatéralement (DOC-011), 1 stale-after (TST-005).
+```
+
+Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est omise.
+
+### Edge cases
+
+- **Cascade qui résout un autre item du batch en cours** (cas `fix B<n>`) : si le re-check post-fix de l'item #1 résout DUP-008 et que DUP-008 est l'item #2 du batch → skip DUP-008 dans la suite avec annonce *"DUP-008 déjà résolu collatéralement par DUP-007, skip."* Réutilise le pattern existant *"Finding déjà résolu entre `list` et action → skip avec annonce."*
+- **`update` rencontre un `stale-after-<ID>` existant** : laisser tel quel, ne pas remplacer par un `stale` générique — l'info de cause est plus précieuse (cf. *Mode : update > Flux* étape 2.b).
+
+### Idempotence et borne de coût
+
+- Idempotent : re-runner la cascade sur le même commit ne re-bouge rien (les cascadés sont déjà dans Resolved, le filtre à l'étape 2 les exclut).
+- Coût : ∝ |pendings ∩ overlap diff|, pas |pendings|. ≤ ~20 lignes lues par candidat (le re-check par-dim borne lui-même).
+- Aucun coût si overlap zéro (filtrage tôt à l'étape 2, sortie silencieuse à l'étape 3).
+
+### Distinction avec `/maintainability-update`
+
+`update` est exhaustif et explicite — l'utilisateur le lance pour rattraper des fixes hors-session. La cascade est **ciblée et automatique** — elle couvre les fixes faits dans la conversation courante. Les deux cohabitent : la cascade limite la dérive intra-session, `update` ratisse plus large quand la dérive a échappé.
 
 ## Edge cases
 
