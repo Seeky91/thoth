@@ -229,16 +229,16 @@ Rolling (N=4) :
   2026-04-22 — core/api_handler.py — 8 findings (pending)
   2026-04-15 — services/auth/ — 3 findings (résolus tous)
 
-Batches suggérés :
-  [B1] DUP-007 + SIZ-003 (2 findings, même fichier core/api_handler.py)
-       → Refactor unifié : extraire la dup avant le split god file. Touche 1 fichier.
-  [B2] CPX-005 + TST-001 + DRF-002 (3 findings, sequencing explicite dans double-checks)
-       → Bundle "stabiliser API avant refactor" — CPX-005 référence "à faire avant DRF-002".
+Batches suggérés (2) :
 
-Sur ces batches, tu veux :
-  (a) double-check B1   (b) fix B1 avec checkpoints
-  (c) double-check B2   (d) fix B2 avec checkpoints
-  (e) rien.
+  B1 · core/api_handler.py · Δ ~+45 · 2 findings  ★ recommandé : 1 fichier, blast radius bas
+       DUP-007·HIGH + SIZ-003·HIGH — extraire la dup avant le split god file
+
+  B2 · multi-fichiers (3 paths) · Δ ~-30 · 3 findings
+       CPX-005·MED + TST-001·MED + DRF-002·MED — sequencing explicite (CPX-005 → DRF-002)
+
+Je propose `double-check B1` (recommandé).
+Sinon : `fix B1` direct, un autre batch (`double-check B2` / `fix B2`), ou `rien`.
 ```
 
 Si zéro pending : afficher `Pending (0) : aucun finding actif.`
@@ -254,10 +254,42 @@ Si zéro audit : afficher `Aucun audit dans l'historique. Lance /maintainability
 4. Garder seulement les batches de 2 à 5 findings. Lister explicites en premier, compléter avec heuristiques. Max 3 affichés.
 5. Si aucun batch valide : afficher *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt de sélection.
 
-**Action selon la réponse utilisateur** (pattern (a)/(b)/(c) en chat, comme le panel post-audit en section H) :
+**Format d'affichage** (deux lignes par batch + une ligne de proposition d'action) :
+
+```
+  B<n> · <zone> · Δ ~<±N> · <K> findings  [★ recommandé : <raison courte>]
+       <ID·SEV> + <ID·SEV> + … — <rationale 1 ligne>
+```
+
+- `<zone>` = path (fichier ou dossier) si tous les findings partagent un path, sinon `multi-fichiers (<K> paths)`.
+- `Δ ~<±N>` = somme des `Δ LoC` des findings du batch (estimation initiale ou affinée si Double-check présent).
+- `<rationale 1 ligne>` = motif du groupage en une phrase concise. Pour signal explicite : citer brièvement la mention (« reco TST-005 demande DUP-009 d'abord »). Pour heuristique : décrire le pattern (« même module-folder », « sequencing dans Double-checks »).
+- `★ recommandé : <raison>` = marqueur inline sur **un seul** batch (cf. *Recommandation*).
+
+**Recommandation** : marquer un batch `★ recommandé` selon ces critères, dans l'ordre :
+
+1. **Scope minimal** : préférer 1 fichier > module > multi-modules (blast radius bas).
+2. **Signal explicite** : préférer un batch issu d'un signal explicite sur un batch heuristique.
+3. **`|Δ LoC|` le plus faible** (changement le plus contenu).
+4. **Tie-break** : ID le plus petit (`B1` > `B2` > …).
+
+La raison courte affichée à côté du `★` reprend le critère qui a tranché (ex. `1 fichier, blast radius bas`, `co-design explicite`, `Δ LoC contenu`).
+
+Si aucun batch ne se distingue (≥ 2 batches strictement équivalents sur les 4 critères) : ne pas marquer `★`. Le prompt d'action devient *"Plusieurs batches équivalents — choisis selon ta priorité (`double-check B<n>`, `fix B<n>`, `rien`)."*
+
+**Prompt d'action** (post-affichage des batches) :
+
+```
+Je propose `double-check B<reco>` (recommandé).
+Sinon : `fix B<reco>` direct, un autre batch (`double-check B<n>` / `fix B<n>`), ou `rien`.
+```
+
+L'utilisateur répond en texte libre.
+
+**Action selon la réponse utilisateur** :
 
 - **`double-check B<n>`** : exécuter le flux *Mode : double-check* sur chaque finding du batch dans l'ordre. Sortie agrégée en un seul message (verdict par ID).
-- **`fix B<n> avec checkpoints`** :
+- **`fix B<n>`** (l'exécution applique systématiquement les checkpoints décrits ci-dessous — l'utilisateur n'a pas à le préciser) :
   1. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée` si présente, sinon `Reco`.
   2. Afficher le plan global, demander un OK explicite. Si OK, exécuter dans l'ordre.
   3. **Avant** chaque marquage `Resolution`, lancer la suite de tests (détectée via marqueurs : `cargo test`, `npm test`, `pytest`, `go test ./...`, etc. ; sinon demander la commande). Tests OK → flux résolution intra-session (move + compaction, cf. *Cycle de vie*). Tests KO → arrêt, ne pas marquer, annoncer ; pas de revert auto.
