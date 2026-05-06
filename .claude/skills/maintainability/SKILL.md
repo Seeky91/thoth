@@ -35,7 +35,7 @@ Avant tout dispatch de mode, le skill confirme que `cwd` est la racine d'un proj
 4. **Si trouvé dans un parent** : annoncer *"Le root projet semble être `<chemin-parent>`, mais le `cwd` est `<cwd>`. Relance depuis `<chemin-parent>` ou confirme l'opération ici (le `.claude/` sera créé dans le `cwd`)."* et attendre.
 5. **Si aucun marqueur trouvé nulle part** : abort avec *"Aucun marqueur de projet détecté (.git, package.json, pyproject.toml, …). Lance la commande depuis la racine d'un projet."*
 
-Ce check ne s'applique pas si l'utilisateur passe un `<path>` absolu en argument — dans ce cas, le path lui-même est le scope, et le `.claude/` est créé là où se trouve le marqueur de root le plus proche du path.
+Ce check ne s'applique pas si l'utilisateur passe un `<path>` en argument (absolu, ou relatif résolu vs `cwd`) — dans ce cas, le path lui-même est le scope, et le `.claude/` est créé là où se trouve le marqueur de root le plus proche du path.
 
 ## Mode : audit
 
@@ -89,6 +89,7 @@ Calculer à chaque audit (jamais persisté). Algorithme :
 
 ### D. Audit forcé (mode `<path>`)
 
+0. Si bootstrap nécessaire (`.claude/maintainability_*.md` absent) : suivre la section *A. Bootstrap* avant les étapes ci-dessous.
 1. Vérifier que le chemin existe dans le projet courant.
 2. Mesurer la taille de la zone (LoC source agrégée).
 3. **Si > 5000 LoC** : refuser un audit aveugle. Annoncer la taille, proposer un sous-scope (ex. *"trop large à 6200 LoC. Sous-scopes possibles : `<path>/sub1/`, `<path>/sub2/`"*) et demander confirmation. L'utilisateur peut forcer s'il insiste, en sachant que l'audit sera moins profond.
@@ -104,7 +105,7 @@ Pour la zone validée :
   - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition selon la grille), **estimer le Δ LoC** que produirait l'application de la reco (négatif si la reco supprime du code, positif si elle en ajoute, format `~±N`). Voir section *Estimation Δ LoC*.
   - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
 3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres. Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
-4. **Assignation des IDs** : pour chaque finding nouveau, scanner le findings file, max existant pour le préfixe → incrément. Format à 3 chiffres (`DUP-007`).
+4. **Assignation des IDs** : suivre le mécanisme de la section *Compteur d'IDs* (lire le header `<!-- id_counters: ... -->`, incrémenter, mettre à jour la ligne header). Format à 3 chiffres (`DUP-007`).
 
 ### F. Écritures
 
@@ -323,7 +324,7 @@ Déclenché par `/maintainability update`. **Pas d'audit nouveau.** Re-vérifie 
   - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
 4. Pour chaque stale : laisser dans Pending mais ajouter `Status: stale (YYYY-MM-DD) — fichier introuvable, à rouvrir manuellement avec nouveau path ou archiver`. Demander à l'utilisateur en chat : *"M-XX référence un fichier introuvable. Rouvrir avec nouveau path ou archiver ?"*
 5. **Vérification de l'invariant cap Resolved** : compter les entrées de la section `## Resolved` après les moves de l'étape 3. Si > cap (cf. *Format des fichiers projet > maintainability_findings.md*), appliquer le flux d'archivage automatique (cf. *Cycle de vie d'un finding* étape 5) pour ramener au cap.
-6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->` du fichier findings (le créer s'il est absent). Self-heal contre drift (édition manuelle, bug du skill). C'est le seul moment où le skill lit l'archive — coût acceptable car `update` est rare et explicite.
+6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->` du fichier findings (le créer s'il est absent). Self-heal contre drift (édition manuelle, bug du skill). Le skill lit l'archive ici et dans `archive-clear` uniquement — coût acceptable car les deux opérations sont rares et explicites.
 
 ### Sortie en chat
 
@@ -439,14 +440,9 @@ Déclenché par `/maintainability archive-clear [--all|--keep N|--older-than <du
 
 `IDM` cible la non-conformité aux patterns idiomatiques du langage. Le risque de cette dimension est qu'elle dérive en linter de style — le cadrage suivant est strict.
 
-**Détection des langages** : avant l'audit, identifier les langages présents dans la zone via les extensions de fichiers et les fichiers de configuration (`Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, `Gemfile`, `pom.xml`, `composer.json`, …). Sur projet multi-langage, évaluer IDM zone par zone selon le langage dominant de la zone.
+**Détection des langages** : avant l'audit, identifier les langages via extensions et fichiers de config (`Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, `Gemfile`, `pom.xml`, `composer.json`, …). Sur projet multi-langage, évaluer IDM zone par zone selon le langage dominant.
 
-**Périmètre inclus** : patterns structurels avec impact maintenabilité direct (lisibilité par un dev habitué au langage, error-prone-ness évitable, friction avec l'écosystème). Liste indicative, à étendre selon les langages rencontrés :
-- **Rust** : `Result`/`Option` plutôt qu'`unwrap`/`panic` en code production, opérateur `?`, builder pattern (`with_xxx`), traits cohérents (`Display`, `Debug`, `Default`), RAII pour la gestion des ressources.
-- **Python** : context managers (`with`) plutôt que try/finally manuels, dataclasses au lieu de dicts ad-hoc pour structures typées, `pathlib` pour les chemins, comprehensions quand approprié.
-- **Go** : `defer` pour le cleanup, error wrapping avec `fmt.Errorf("...: %w", err)`, interfaces définies côté consommateur.
-- **JS/TS** : async/await plutôt que chaînes de Promise, types stricts en TS (pas `any` systématique), destructuration quand elle clarifie.
-- **Java** : try-with-resources, `Optional` plutôt que null, streams quand approprié.
+**Périmètre inclus** : patterns structurels avec impact maintenabilité direct — lisibilité par un dev habitué au langage, error-prone-ness évitable, friction avec l'écosystème. Familles à couvrir : gestion d'erreur idiomatique (Rust `Result`/`?`, Go error wrapping, Python `try/except` ciblé), gestion des ressources (context managers Python, `defer` Go, RAII Rust, try-with-resources Java), types et conteneurs adaptés (dataclasses Python, types stricts TS, `Optional` Java), patterns de construction du langage (builder Rust, comprehensions Python). L'agent s'appuie sur sa connaissance des idiomes du langage rencontré, pas sur une liste fermée du skill.
 
 **Périmètre exclu** : tout ce qui est automatisable par un linter ou un formatter — naming style (snake_case vs camelCase), ordre des imports, indentation, choix de quotes, longueur de ligne, espace avant parenthèse. Hors scope du skill.
 
@@ -637,7 +633,7 @@ Le fichier `maintainability_findings.md` porte un header en commentaire HTML qui
 
 **Header absent** (cas migration depuis un état pré-archive, ou édition manuelle qui l'a viré) : scan one-shot de `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), calcul des max par préfixe, écriture du header. Coût ponctuel, jamais répété ensuite.
 
-**Self-healing** : à chaque `update`, recompute des compteurs en re-scannant les deux fichiers (cf. *Mode : update > Flux* étape 6). Seul moment où le skill lit l'archive — coût acceptable car `update` est rare et explicite.
+**Self-healing** : à chaque `update`, recompute des compteurs en re-scannant les deux fichiers (cf. *Mode : update > Flux* étape 6). Avec `archive-clear`, ce sont les seuls moments où le skill lit l'archive — coût acceptable car les deux opérations sont rares et explicites.
 
 Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042` reste lisible).
 
