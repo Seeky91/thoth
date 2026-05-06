@@ -134,7 +134,7 @@ Si l'audit produit zéro finding (zone réellement clean sur toutes les dimensio
   - YYYY-MM-DD — <zone> — 0 findings (clean)
   ```
 - Ne **rien appender** dans `maintainability_findings.md` (pas de pending à créer).
-- Sortie en chat : *"Audit terminé — `<zone>`. Aucun finding produit, zone propre sur toutes les dimensions examinées."*
+- Sortie en chat : *"Audit terminé — `<zone>`. Aucun finding produit, zone propre sur toutes les dimensions examinées. Files mis à jour : .claude/maintainability_history.md (+1 ligne `0 findings (clean)`)."*
 
 L'écriture de la ligne history est **importante** : sans elle, la zone serait re-proposée trop tôt par le rolling. Une zone propre reste légitimement dans le rolling pour éviter le ressassement.
 
@@ -155,7 +155,7 @@ Audit terminé — services/billing/refund/
 
 Δ LoC total estimé si tout est appliqué : ~-23.
 
-Détails dans `.claude/maintainability_findings.md`.
+Files mis à jour : .claude/maintainability_findings.md (+6 findings), .claude/maintainability_history.md (+1 ligne).
 Pour creuser un item à la main : /maintainability-double-check DUP-007.
 
 Tu peux aussi me laisser creuser en autonomie. Sur quoi ?
@@ -198,7 +198,7 @@ Après le résumé en chat, si l'audit a produit ≥ 1 finding, proposer trois o
     INC-008 — GO-après-DUP-007 (Δ ±5, à fusionner avec le refactor de refund pour éviter de toucher 2× le même fichier)
     TST-005 — NO-GO (Δ -20 mais les 4 tests d'impl couvrent un edge case que le contrat ne capture pas — à archiver)
 
-  Détails complets dans .claude/maintainability_findings.md.
+  Files mis à jour : .claude/maintainability_findings.md (+3 sections Double-check).
   ```
 
 - **(b) Heavy finding** : exécuter le flux *Mode : double-check* sur le finding sélectionné. Sortie complète comme un double-check standard (pas d'agrégation).
@@ -369,8 +369,9 @@ Cette commande lit potentiellement beaucoup de fichiers (un par pending). Accept
 
 Indépendamment de la commande `update` explicite, **pendant la conversation qui suit un audit ou un double-check**, si l'utilisateur applique un fix qui résout un finding listé :
 
-1. Le skill propose : *"Ce fix résout DUP-007. Je marque comme résolu ?"*
-2. Si oui : applique le même flux que update sur cet ID unique (déplacer en Resolved, ajouter Resolution, mettre à jour history).
+1. Le skill **exécute la re-vérification en cascade en lecture seule** (cf. *Re-vérification en cascade > Confirmation utilisateur*), puis propose la confirmation batchée — primaire + cascadés + stale-after en un seul prompt. Si overlap = 0 (aucun autre pending sur les fichiers du diff) : prompt simple *"Ce fix résout DUP-007. Je marque comme résolu ?"*.
+2. Si l'utilisateur valide : applique le même flux que update sur le primaire (move Pending → Resolved, bullet `Resolution`, ligne history) **et** exécute les écritures cascade (cascade-resolved au format compact, stale-after taggés, lignes history complétées pour cascadés, cap Resolved respecté).
+3. **Confirmer en chat** par une ligne explicite `Files mis à jour : .claude/maintainability_findings.md (move <ID> → Resolved [+ N cascadés] [+ M stale-after]), .claude/maintainability_history.md (résolus <ID>+...)` détaillant les écritures effectuées. Si push-back partiel à l'étape 1 (l'utilisateur a refusé certains items) : la ligne reflète seulement ce qui a été appliqué.
 
 Cette détection est **opportuniste, pas exhaustive**. Pour une re-vérification systématique après plusieurs fixes hors-session, l'utilisateur lance `/maintainability-update`.
 
@@ -746,6 +747,66 @@ Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est o
 ### Distinction avec `/maintainability-update`
 
 `update` est exhaustif et explicite — l'utilisateur le lance pour rattraper des fixes hors-session. La cascade est **ciblée et automatique** — elle couvre les fixes faits dans la conversation courante. Les deux cohabitent : la cascade limite la dérive intra-session, `update` ratisse plus large quand la dérive a échappé.
+
+## Invariant de fin de mode
+
+Avant de rendre la main à l'utilisateur, l'agent **doit** valider que toutes les écritures attendues du mode courant ont eu lieu. Cette section liste le checklist par mode — toute case applicable non cochée doit être exécutée avant de répondre. Garde-fou cognitif contre le drift sur les flux multi-écritures (intra-session resolution, update batch, cascade), où une étape secondaire peut être silencieusement omise après que l'étape principale a été faite.
+
+Une case **non applicable** au cas courant (ex. cap Resolved pas dépassé donc pas d'archivage, pas de reclassification de sévérité donc pas de titre amendé) est considérée cochée — la liste cible les omissions silencieuses, pas les opérations toujours requises.
+
+### Audit (mode auto ou forcé)
+
+- Findings appendés dans `## Pending` de `maintainability_findings.md` — un par finding produit (ou aucun si zone propre).
+- Header `<!-- id_counters: ... -->` incrementé pour chaque préfixe utilisé.
+- Ligne préfixée en tête de `maintainability_history.md` (`- YYYY-MM-DD — <zone> — N findings ...` ou `0 findings (clean)` si zone propre).
+- Rolling trimmé : taille recalculée, lignes en surplus du bas supprimées.
+- Si bootstrap a eu lieu : `.claude/maintainability_history.md` et `.claude/maintainability_findings.md` créés avec le contenu initial spécifié (cf. *Mode : audit > A. Bootstrap*).
+
+### Double-check
+
+- Section `Double-check (YYYY-MM-DD) :` ajoutée à l'entrée du finding ciblé.
+- Si reclassification de sévérité validée : titre `### <ID> — <NEW-SEV> — <localisation>` modifié, attribut `Dimension` éventuellement ajusté.
+
+### Update
+
+- Chaque pending re-vérifié (lecture du fichier + check par-dimension).
+- Résolus détectés déplacés vers `## Resolved` au format compact.
+- Stales détectés taggés `Status: stale` ; `stale-after-<ID>` existants préservés (pas écrasés).
+- Lignes `maintainability_history.md` correspondantes complétées (`(résolus <ID>+...)`).
+- Cap Resolved appliqué : si > cap après les moves, archivage automatique vers `maintainability_resolved_archive.md` jusqu'à ramener au cap.
+- Header `<!-- id_counters: ... -->` recomputed (self-heal en re-scannant findings + archive).
+
+### Résolution intra-session (cycle de vie étape 3)
+
+- Entrée déplacée Pending → Resolved au format compact (Observation, Reco, Δ initial, Status, Double-check droppés).
+- Bullet `Resolution :` complète (description + `Δ LoC mesuré : <valeur>` + `Commit : <hash>`).
+- `(résolu YYYY-MM-DD)` ajouté au titre.
+- Ligne history correspondante mise à jour (`(résolus <ID>+...)`).
+- **Re-vérification en cascade déclenchée** sur les pendings overlap diff (cf. section dédiée).
+- Cap Resolved respecté (archivage si débordement après le move primaire + cascadés).
+
+### Re-vérification en cascade
+
+- Diff capté via `git show --name-only <hash>` (ou cascade explicitement sautée avec annonce *"Cascade re-check sautée : pas de commit identifié pour `<ID>`"* si pas de hash).
+- Candidats filtrés par overlap diff (zéro candidat → sortie silencieuse, aucune écriture).
+- Cascade-resolved déplacés vers `## Resolved` au format compact avec `Resolution :` adapté (résolu collatéralement par fix de `<ID-primaire>`).
+- Stale-after-`<ID>` taggés (bullet `Status` remplacée).
+- Lignes `maintainability_history.md` complétées pour chaque cascade-resolved (via `Détecté` lu avant le move).
+- Cap Resolved respecté (archivage si débordement après les cascadés).
+
+### Archive-clear
+
+- Archive réécrite avec les seules entrées `kept` (ou fichier supprimé si `kept = []` cas `--all`).
+- Header `<!-- id_counters: ... -->` recomputed **avant** la suppression (les IDs futurs continuent monotonement).
+- Pas d'écriture sur `maintainability_history.md` ni sur `## Pending` / `## Resolved` du findings file.
+
+### List
+
+Aucune écriture attendue — vérifier qu'aucun fichier projet n'a été modifié pendant le mode (read-only strict).
+
+### Si une case n'a pas pu être cochée
+
+Si une condition empêche une écriture attendue (e.g. tests KO bloque le marquage Resolution dans `fix B<n>`, fichier en lecture seule, conflit de merge dans le findings file) : **annoncer en chat** ce qui n'a pas pu être fait et pourquoi, plutôt que rendre la main silencieusement. L'utilisateur doit savoir qu'un état partiel existe.
 
 ## Edge cases
 
