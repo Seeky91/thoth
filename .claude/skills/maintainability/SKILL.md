@@ -6,22 +6,31 @@ description: Use when the user invokes `/maintainability`, asks for a maintainab
 # Maintainability skill
 
 ## Quand l'invoquer
-Slash command `/maintainability` (avec ou sans args). Ne pas invoquer ce skill pour : audits de sécurité, de performance, d'accessibilité, ou choix de stack — ce sont d'autres revues.
+
+Famille de slash commands :
+
+- `/maintainability` — audit (auto si pas d'arg, forcé si `<path>` fourni)
+- `/maintainability-list` — tableau de bord, lecture seule
+- `/maintainability-update` — re-vérification de tous les pendings
+- `/maintainability-double-check <ID>` — deep-dive sur un finding existant
+- `/maintainability-archive-clear [--all|--keep N|--older-than <dur>]` — purge de l'archive
+
+Chaque command file invoque ce skill avec un mode pré-déterminé. Ne pas invoquer ce skill pour : audits de sécurité, de performance, d'accessibilité, ou choix de stack — ce sont d'autres revues.
 
 ## Dispatch des modes
 
-Parse `$ARGUMENTS` selon ces règles, en ordre :
+Le mode est fixé par la slash command utilisée (cf. ci-dessus). La table ci-dessous est la référence canonique de l'argument que chaque mode attend dans `$ARGUMENTS` :
 
-| Args | Mode | Action |
+| Command | Mode | `$ARGUMENTS` attendu |
 |---|---|---|
-| `list` | **list** | Affiche le tableau de bord. Aucune écriture de fichier. |
-| `update` | **update** | Re-vérifie tous les pendings, met à jour les statuts. |
-| `double-check <ID>` | **double-check** | Deep-dive sur le finding `<ID>` (ex. `DUP-007`). |
-| `archive-clear [--all\|--keep N\|--older-than <dur>]` | **archive-clear** | Purge l'archive (défaut : entrées résolues > 6 mois). Confirme avant d'écrire. |
-| `<path>` (chemin existant dans le repo) | **audit forcé** | Audite la zone fournie. Saute la sélection auto. |
-| (vide) | **audit auto** | Inventaire des zones, sélection autonome avec validation user, puis audit. |
+| `/maintainability-list` | **list** | (aucun) — affiche le tableau de bord, aucune écriture. |
+| `/maintainability-update` | **update** | (aucun) — re-vérifie tous les pendings, met à jour les statuts. |
+| `/maintainability-double-check` | **double-check** | `<ID>` (ex. `DUP-007`) — deep-dive sur le finding. |
+| `/maintainability-archive-clear` | **archive-clear** | `[--all\|--keep N\|--older-than <dur>]` — défaut : > 6 mois. Confirme avant d'écrire. |
+| `/maintainability <path>` | **audit forcé** | chemin existant dans le repo — audite la zone fournie. |
+| `/maintainability` (vide) | **audit auto** | (aucun) — inventaire des zones, sélection autonome avec validation user, puis audit. |
 
-Si l'argument ne correspond à aucune des règles ci-dessus (e.g. typo, ID invalide, path inexistant) : le skill **demande une clarification à l'utilisateur** plutôt que de deviner.
+Si `$ARGUMENTS` ne respecte pas le format attendu pour la command invoquée (e.g. ID invalide pour double-check, path inexistant pour audit forcé) : le skill **demande une clarification à l'utilisateur** plutôt que de deviner.
 
 Toutes les opérations supposent que le répertoire courant est la racine d'un projet à auditer. Le skill **vérifie ce point avant tout** (voir section *Détection du root projet*). Si `.claude/` n'existe pas dans le projet, le skill bootstrappe (voir section Bootstrap).
 
@@ -147,7 +156,7 @@ Audit terminé — services/billing/refund/
 Δ LoC total estimé si tout est appliqué : ~-23.
 
 Détails dans `.claude/maintainability_findings.md`.
-Pour creuser un item à la main : /maintainability double-check DUP-007.
+Pour creuser un item à la main : /maintainability-double-check DUP-007.
 
 Tu peux aussi me laisser creuser en autonomie. Sur quoi ?
   (a) un panel de quick-wins : DOC-011, INC-008, TST-005 — 3 findings au fix court et peu de blast radius.
@@ -200,7 +209,7 @@ Après le résumé en chat, si l'audit a produit ≥ 1 finding, proposer trois o
 
 ## Mode : list
 
-Déclenché par `/maintainability list`. **Pas d'audit, pas de re-vérification, aucune écriture de fichier.** Lecture seule des deux fichiers projet.
+Déclenché par `/maintainability-list`. **Pas d'audit, pas de re-vérification, aucune écriture de fichier.** Lecture seule des deux fichiers projet.
 
 ### Flux
 
@@ -305,7 +314,7 @@ Si `.claude/maintainability_*.md` n'existent pas, **ne pas bootstrapper** (mode 
 
 ## Mode : update
 
-Déclenché par `/maintainability update`. **Pas d'audit nouveau.** Re-vérifie tous les pendings contre l'état actuel du code et met à jour les statuts.
+Déclenché par `/maintainability-update`. **Pas d'audit nouveau.** Re-vérifie tous les pendings contre l'état actuel du code et met à jour les statuts.
 
 ### Flux
 
@@ -351,11 +360,11 @@ Indépendamment de la commande `update` explicite, **pendant la conversation qui
 1. Le skill propose : *"Ce fix résout DUP-007. Je marque comme résolu ?"*
 2. Si oui : applique le même flux que update sur cet ID unique (déplacer en Resolved, ajouter Resolution, mettre à jour history).
 
-Cette détection est **opportuniste, pas exhaustive**. Pour une re-vérification systématique après plusieurs fixes hors-session, l'utilisateur lance `/maintainability update`.
+Cette détection est **opportuniste, pas exhaustive**. Pour une re-vérification systématique après plusieurs fixes hors-session, l'utilisateur lance `/maintainability-update`.
 
 ## Mode : double-check
 
-Déclenché par `/maintainability double-check <ID>` (ex. `/maintainability double-check DUP-007`). Approfondit un finding existant, ne crée pas de nouveau finding.
+Déclenché par `/maintainability-double-check <ID>` (ex. `/maintainability-double-check DUP-007`). Approfondit un finding existant, ne crée pas de nouveau finding.
 
 ### Flux
 
@@ -390,7 +399,7 @@ Réponse complète en chat (l'utilisateur veut le détail pour décider) avec un
 
 ## Mode : archive-clear
 
-Déclenché par `/maintainability archive-clear [--all|--keep N|--older-than <duration>]`. Purge `maintainability_resolved_archive.md` selon les critères. Toujours confirmer avant d'écrire.
+Déclenché par `/maintainability-archive-clear [--all|--keep N|--older-than <duration>]`. Purge `maintainability_resolved_archive.md` selon les critères. Toujours confirmer avant d'écrire.
 
 ### Flux
 
@@ -642,13 +651,13 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
 ## Cycle de vie d'un finding
 
 1. **Création** lors d'un audit → entrée `## Pending` avec ID, dimension, sévérité, observation, reco, date, `Status: pending`.
-2. **Double-check** (`/maintainability double-check <ID>`) → ajoute une section `Double-check (date)` dans l'entrée existante. Peut amender la reco. Peut révéler un changement de sévérité (proposer à l'utilisateur, valider, puis amender l'attribut).
+2. **Double-check** (`/maintainability-double-check <ID>`) → ajoute une section `Double-check (date)` dans l'entrée existante. Peut amender la reco. Peut révéler un changement de sévérité (proposer à l'utilisateur, valider, puis amender l'attribut).
 3. **Résolution intra-session** → quand l'utilisateur applique un fix dans la conversation qui suit un audit ou un double-check, le skill **propose** de marquer résolu :
   - Déplace l'entrée en `## Resolved` au **format compact** (cf. *Format compact d'une entrée résolue*) — Observation, Reco, Δ initial, Status, Double-check sont droppés.
   - Ajoute `(résolu YYYY-MM-DD)` dans le titre.
   - La bullet `Resolution` contient : description courte du fix + `Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` ou comptage direct ; faire la mesure dans le tour de conversation si possible) + `Commit : <hash>` du commit qui applique le fix.
   - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix.
-4. **Update** (`/maintainability update`) → re-vérifie chaque pending :
+4. **Update** (`/maintainability-update`) → re-vérifie chaque pending :
   - Pattern toujours présent → status inchangé.
   - Pattern absent → bascule en Resolved au format compact (cf. étape 3) ; `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD)` + Δ mesuré + `Commit : <hash>` si identifiable via `git log`.
   - Fichier disparu / déplacé → `Status: stale`. Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, ou archiver).

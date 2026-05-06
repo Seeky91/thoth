@@ -25,18 +25,14 @@ Depuis la racine de ce dépôt, copier les fichiers dans votre dossier Claude :
 mkdir -p ~/.claude/skills/maintainability ~/.claude/commands
 
 cp .claude/skills/maintainability/SKILL.md ~/.claude/skills/maintainability/
-cp .claude/commands/maintainability.md ~/.claude/commands/
-````
+cp .claude/commands/maintainability*.md ~/.claude/commands/
+```
 
 ---
 
 ## Utilisation
 
-Le skill `maintainability` expose une commande principale :
-
-```bash
-/maintainability [arguments]
-```
+Le skill `maintainability` expose une famille de slash commands, une par mode. Chaque sous-commande possède son propre `argument-hint` dans l'autocomplétion.
 
 ### Commandes disponibles
 
@@ -65,7 +61,7 @@ Le skill `maintainability` expose une commande principale :
 #### 📊 Afficher le tableau de bord
 
 ```bash
-/maintainability list
+/maintainability-list
 ```
 
 * Liste les findings en cours
@@ -77,7 +73,7 @@ Le skill `maintainability` expose une commande principale :
 #### 🔄 Mettre à jour les findings
 
 ```bash
-/maintainability update
+/maintainability-update
 ```
 
 * Re-vérifie tous les findings `pending`
@@ -89,7 +85,7 @@ Le skill `maintainability` expose une commande principale :
 #### 🔎 Approfondir un finding
 
 ```bash
-/maintainability double-check <ID>
+/maintainability-double-check <ID>
 ```
 
 * Analyse en profondeur un finding existant
@@ -102,7 +98,7 @@ Le skill `maintainability` expose une commande principale :
 #### 🗃 Purger l’archive des résolus
 
 ```bash
-/maintainability archive-clear [--all | --keep N | --older-than <durée>]
+/maintainability-archive-clear [--all | --keep N | --older-than <durée>]
 ```
 
 * Purge `maintainability_resolved_archive.md` selon le critère choisi

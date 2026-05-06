@@ -1,10 +1,8 @@
 ---
-description: Maintainability audit. Usage: /maintainability [path|list|update|double-check <ID>|archive-clear]
-argument-hint: "[path | list | update | double-check <ID> | archive-clear [--all|--keep N|--older-than <dur>]]"
+description: Run a maintainability audit (auto-selects a zone if no path is given)
+argument-hint: "[<path>]"
 ---
 
-Invoke the maintainability skill at `~/.claude/skills/maintainability/SKILL.md`.
+Invoke the maintainability skill in **audit** mode. Arguments: $ARGUMENTS
 
-Arguments: $ARGUMENTS
-
-Parse the arguments and dispatch to the appropriate mode (audit, list, update, double-check, archive-clear) per the skill's dispatch table. If `$ARGUMENTS` is empty, run an audit with autonomous zone selection.
+If `$ARGUMENTS` is empty, run an audit with autonomous zone selection (mode `audit auto`). If `$ARGUMENTS` is a path, audit that zone directly (mode `audit forcé`). See "Mode : audit" in the skill's `SKILL.md`.
