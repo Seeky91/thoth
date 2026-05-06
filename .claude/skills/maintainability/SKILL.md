@@ -17,6 +17,7 @@ Parse `$ARGUMENTS` selon ces règles, en ordre :
 | `list` | **list** | Affiche le tableau de bord. Aucune écriture de fichier. |
 | `update` | **update** | Re-vérifie tous les pendings, met à jour les statuts. |
 | `double-check <ID>` | **double-check** | Deep-dive sur le finding `<ID>` (ex. `DUP-007`). |
+| `archive-clear [--all\|--keep N\|--older-than <dur>]` | **archive-clear** | Purge l'archive (défaut : entrées résolues > 6 mois). Confirme avant d'écrire. |
 | `<path>` (chemin existant dans le repo) | **audit forcé** | Audite la zone fournie. Saute la sélection auto. |
 | (vide) | **audit auto** | Inventaire des zones, sélection autonome avec validation user, puis audit. |
 
@@ -44,7 +45,7 @@ Déclenché par `/maintainability` (auto) ou `/maintainability <path>` (forcé).
 
 1. Si `.claude/` n'existe pas dans le projet : créer le dossier.
 2. Si `maintainability_history.md` absent : créer avec `# Maintainability audit history\n\n` (rien d'autre).
-3. Si `maintainability_findings.md` absent : créer avec `# Maintainability findings\n\n## Pending\n\n## Resolved\n`. Pas de header `<!-- id_counters: ... -->` à ce stade (création paresseuse à la première assignation d'ID). Pas non plus de `maintainability_resolved_archive.md` (création paresseuse au 11e résolu).
+3. Si `maintainability_findings.md` absent : créer avec `# Maintainability findings\n\n## Pending\n\n## Resolved\n`. Pas de header `<!-- id_counters: ... -->` à ce stade (création paresseuse à la première assignation d'ID). Pas non plus de `maintainability_resolved_archive.md` (création paresseuse au premier débordement du cap Resolved).
 4. Annoncer en chat : *"Bootstrap maintainability sur ce projet, aucun historique préalable."*
 5. Continuer le flux d'audit normalement (pas de rolling à respecter).
 
@@ -206,6 +207,7 @@ Déclenché par `/maintainability list`. **Pas d'audit, pas de re-vérification,
 2. Compter les pending par sévérité. Lister les IDs avec un one-liner descriptif (extrait de l'observation, ~50 chars).
 3. Lister les résolus des 30 derniers jours (filtrer par la date dans le titre Resolved).
 4. Lister les entrées du rolling (taille `N` actuelle).
+5. Détecter les batches groupables parmi les pending (cf. *Batches suggérés*).
 
 ### Sortie type
 
@@ -226,10 +228,43 @@ Rolling (N=4) :
   2026-05-01 — pipeline:order-processing — 4 findings (pending)
   2026-04-22 — core/api_handler.py — 8 findings (pending)
   2026-04-15 — services/auth/ — 3 findings (résolus tous)
+
+Batches suggérés :
+  [B1] DUP-007 + SIZ-003 (2 findings, même fichier core/api_handler.py)
+       → Refactor unifié : extraire la dup avant le split god file. Touche 1 fichier.
+  [B2] CPX-005 + TST-001 + DRF-002 (3 findings, sequencing explicite dans double-checks)
+       → Bundle "stabiliser API avant refactor" — CPX-005 référence "à faire avant DRF-002".
+
+Sur ces batches, tu veux :
+  (a) double-check B1   (b) fix B1 avec checkpoints
+  (c) double-check B2   (d) fix B2 avec checkpoints
+  (e) rien.
 ```
 
 Si zéro pending : afficher `Pending (0) : aucun finding actif.`
 Si zéro audit : afficher `Aucun audit dans l'historique. Lance /maintainability pour commencer.`
+
+### Batches suggérés
+
+**Détection** (lecture seule, pas d'analyse de code) :
+
+1. Pour chaque pending, extraire ID, dimension prefix, path, audit_origin (date `Détecté:`), et contenu de la dernière section `Double-check` si présente.
+2. **Signaux explicites** (haute priorité) dans le Double-check, regex insensibles à la casse : `bundle`/`bundler`, `sequencing`/`étape \d+`, `après <ID>`/`avant <ID>`, `couplé avec <ID>`. Chaque mention d'un autre `<ID>` connu crée une arête ; composantes connexes = batches.
+3. **Signaux heuristiques** (fallback) : même path exact ; sinon même path parent + même dimension prefix ; sinon même audit_origin.
+4. Garder seulement les batches de 2 à 5 findings. Lister explicites en premier, compléter avec heuristiques. Max 3 affichés.
+5. Si aucun batch valide : afficher *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt de sélection.
+
+**Action selon la réponse utilisateur** (pattern (a)/(b)/(c) en chat, comme le panel post-audit en section H) :
+
+- **`double-check B<n>`** : exécuter le flux *Mode : double-check* sur chaque finding du batch dans l'ordre. Sortie agrégée en un seul message (verdict par ID).
+- **`fix B<n> avec checkpoints`** :
+  1. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée` si présente, sinon `Reco`.
+  2. Afficher le plan global, demander un OK explicite. Si OK, exécuter dans l'ordre.
+  3. **Avant** chaque marquage `Resolution`, lancer la suite de tests (détectée via marqueurs : `cargo test`, `npm test`, `pytest`, `go test ./...`, etc. ; sinon demander la commande). Tests OK → flux résolution intra-session (move + compaction, cf. *Cycle de vie*). Tests KO → arrêt, ne pas marquer, annoncer ; pas de revert auto.
+  4. Récap final : *"X/Y résolus, Δ LoC total mesuré : ..., commits : ..."*.
+- **`rien`** : terminer sans rien faire.
+
+**Cas dégénérés** : batch ID invalide ("B5" alors que seuls B1/B2 listés) → demander relance de `list`. Finding déjà résolu entre `list` et action → skip avec annonce.
 
 ### Cas du projet sans state
 
@@ -250,12 +285,12 @@ Déclenché par `/maintainability update`. **Pas d'audit nouveau.** Re-vérifie 
     - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
     - Si le pattern a disparu → bascule en Resolved.
 3. Pour chaque résolu détecté :
-  - Déplacer l'entrée de `## Pending` vers `## Resolved`.
+  - Déplacer l'entrée de `## Pending` vers `## Resolved` au **format compact** (cf. *Format compact d'une entrée résolue* dans *Format des fichiers projet*) — Observation, Reco, Δ initial et Double-check sont droppés au move.
   - Ajouter `(résolu YYYY-MM-DD)` au titre.
-  - Ajouter bullet `Resolution: détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (mesurer via `git log --since=<date détectée> -- <fichier>` ou comparaison directe avec l'estimation initiale ; si non mesurable, noter `Δ LoC mesuré : indéterminé`).
+  - La bullet `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (via `git log --since=<date> -- <fichier>` ou comparaison directe ; sinon `indéterminé`). Ajouter `Commit : <hash>` si un commit aval est identifiable.
   - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
 4. Pour chaque stale : laisser dans Pending mais ajouter `Status: stale (YYYY-MM-DD) — fichier introuvable, à rouvrir manuellement avec nouveau path ou archiver`. Demander à l'utilisateur en chat : *"M-XX référence un fichier introuvable. Rouvrir avec nouveau path ou archiver ?"*
-5. **Vérification de l'invariant `Resolved ≤ 10`** : compter les entrées de la section `## Resolved` après les moves de l'étape 3. Si > 10 (cas migration depuis un état pré-archive ou édition manuelle), appliquer le flux d'archivage automatique (cf. *Cycle de vie d'un finding* étape 5) pour ramener à 10.
+5. **Vérification de l'invariant cap Resolved** : compter les entrées de la section `## Resolved` après les moves de l'étape 3. Si > cap (cf. *Format des fichiers projet > maintainability_findings.md*), appliquer le flux d'archivage automatique (cf. *Cycle de vie d'un finding* étape 5) pour ramener au cap.
 6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->` du fichier findings (le créer s'il est absent). Self-heal contre drift (édition manuelle, bug du skill). C'est le seul moment où le skill lit l'archive — coût acceptable car `update` est rare et explicite.
 
 ### Sortie en chat
@@ -267,7 +302,7 @@ Re-vérifié 8 pendings :
   Résolus (2) : DUP-005, CPX-008
   Toujours présents (5) : DUP-007, SIZ-003, INC-002, TST-001, DRF-002
   Stale (1) : CFG-003 (config/flags.toml introuvable, déplacé ?)
-  Archivés (3) : DUP-001, DUP-002, INC-001 (cap Resolved=10 atteint)
+  Archivés (3) : DUP-001, DUP-002, INC-001 (cap Resolved atteint)
 
 Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md, .claude/maintainability_resolved_archive.md
 ```
@@ -319,6 +354,32 @@ Si la sévérité change, **également** modifier le titre de l'entrée :
 ### Sortie en chat
 
 Réponse complète en chat (l'utilisateur veut le détail pour décider) avec une copie de ce qui a été écrit dans le fichier + tout contexte additionnel utile (extraits de code des call sites, etc.).
+
+## Mode : archive-clear
+
+Déclenché par `/maintainability archive-clear [--all|--keep N|--older-than <duration>]`. Purge `maintainability_resolved_archive.md` selon les critères. Toujours confirmer avant d'écrire.
+
+### Flux
+
+1. Si l'archive n'existe pas : abort avec *"Pas d'archive sur ce projet, rien à clearer."*
+2. Parser les entrées de l'archive : extraire `ID` et la date `(résolu YYYY-MM-DD)` du titre.
+3. Calculer `dropped` / `kept` selon les args :
+  - **Défaut** (aucun flag) : drop entrées résolues il y a > 6 mois.
+  - `--older-than <duration>` : format `<entier><unité>` avec unités `d`/`m`/`y` (`m`=30j, `y`=365j). Ex. `6m`, `1y`, `90d`. Parse échoué → *"Durée `<input>` non reconnue. Format attendu : `6m`, `1y`, `90d`."*
+  - `--keep N` : conserver les N entrées les plus récentes (date du titre).
+  - `--all` : drop tout.
+4. **Recompute des compteurs d'IDs** (cf. *Mode : update > Flux* étape 6) : scanner findings + archive complète **avant** la suppression, mettre à jour le header `<!-- id_counters: ... -->`. Garantit que les IDs futurs continuent de monter monotonement.
+5. **Confirmation utilisateur** :
+  - `--all` : *"Confirme la suppression totale de l'archive (X entrées). Tape 'oui' pour confirmer."* — attend "oui" littéral.
+  - Autre cas : *"X entrées seront supprimées, Y conservées (la plus récente : <ID> du <date>). Confirmer ? (y/N)"*.
+6. Réécrire l'archive avec les seules entrées `kept`. Si `kept = []` (cas `--all`) : supprimer le fichier (recreation paresseuse au prochain débordement).
+7. Annoncer en chat : *"Archive clearée — X supprimées, Y conservées. Compteurs : DUP=12, SIZ=5, ..."*.
+
+### Garde-fous
+
+- Aucune modification sur `maintainability_findings.md` (sauf le header de compteurs) ni sur `maintainability_history.md`. Les références dangling depuis history vers une entrée archivée disparue restent — convention "voir git".
+- Confirmation obligatoire dans tous les cas, même par défaut.
+- Si le filtre ne capture aucune entrée : *"Filtre `<critère>` ne capture aucune entrée. Archive inchangée."* — pas d'écriture, pas même du header.
 
 ## Catalogue des dimensions (seed)
 
@@ -475,23 +536,39 @@ Source de vérité. Findings groupés en deux sections, plus un header de compte
 
 ### DUP-005 — MED — services/auth/login.py:23 (résolu 2026-04-16)
 - **Dimension :** duplication de code
-- **Observation :** Validation token dupliquée avec `services/auth/refresh.py:18`.
-- **Reco :** Helper `_validate_token()`.
-- **Δ LoC :** ~-25 (estimation initiale).
-- **Resolution :** Extrait vers `services/auth/_helpers.py`. Δ LoC mesuré : -32.
+- **Resolution :** Extrait vers `services/auth/_helpers.py`. Δ LoC mesuré : -32. Commit : a7b3d12.
+- **Audit origin :** 2026-04-15 (services/auth/)
 ```
 
 Règles :
 - En-tête entrée : `### <ID> — <SÉVÉRITÉ> — <localisation>` (avec `(résolu YYYY-MM-DD)` ajouté pour les Resolved).
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
-- Bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check, Resolution).
+- **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check).
+- **Resolved** — format compact à 3 bullets : Dimension, Resolution, Audit origin. Voir *Format compact d'une entrée résolue* ci-dessous.
 - L'ID est immuable. Tout autre attribut peut être amendé.
 - Le header `<!-- id_counters: PREFIX=N, ... -->` cache les compteurs d'IDs pour assignation rapide (cf. *Compteur d'IDs*). Absent dans un fichier fraîchement bootstrappé ; ajouté à la première assignation d'ID.
-- La section `## Resolved` est cappée à **10 entrées** ; les plus anciennes sont déplacées vers `maintainability_resolved_archive.md` automatiquement (cf. *Cycle de vie d'un finding* étape 5).
+- **Cap Resolved = 8** (valeur canonique unique du skill, référencée partout ailleurs). La section `## Resolved` est cappée à 8 entrées ; les plus anciennes sont déplacées vers `maintainability_resolved_archive.md` automatiquement (cf. *Cycle de vie d'un finding* étape 5).
+
+#### Format compact d'une entrée résolue
+
+À chaque move vers `## Resolved` (intra-session, update, NO-GO post double-check). **Drop** : Observation, Reco, Δ initial, Status, Double-check. **Conserver** : 3 bullets fixes :
+
+```markdown
+### DUP-011 — LOW — crates/bot/src/web.rs (résolu 2026-05-06)
+- **Dimension :** duplication scaffolding vault
+- **Resolution :** Helper `vault_blocking<F,T>` ajouté, 4 sites migrés. Δ LoC mesuré : -30. Commit : 86518fb.
+- **Audit origin :** 2026-05-05 (crates/bot/src/web.rs)
+```
+
+`Resolution` doit contenir : description courte du fix + `Δ LoC mesuré : <valeur>` + `Commit : <hash>` (ou `Commits : <h1>+<h2>`). `Audit origin` reprend la date et la zone de l'audit qui a produit le finding.
+
+**Cas NO-GO archivé** (cf. *Mode : audit > H. Proposition de double-check autonome*) : `Resolution` cite la raison du NO-GO en 1-2 phrases ; `Δ LoC : N/A (NO-GO)` remplace le Δ mesuré.
+
+Les entrées Resolved en format verbose **existantes** restent valides — pas de re-écriture rétroactive.
 
 ### `.claude/maintainability_resolved_archive.md`
 
-Cold storage pour les entrées de `## Resolved` qui débordent du cap à 10. **Jamais lu par défaut** : le skill ne le charge que pendant `update` (recompute des compteurs d'IDs). Création paresseuse au premier débordement.
+Cold storage pour les entrées de `## Resolved` qui débordent du cap (valeur définie en *Format des fichiers projet > maintainability_findings.md > Règles*). **Jamais lu par défaut** : le skill ne le charge que pendant `update` (recompute des compteurs d'IDs). Création paresseuse au premier débordement.
 
 ```markdown
 # Maintainability resolved archive
@@ -539,20 +616,20 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
 1. **Création** lors d'un audit → entrée `## Pending` avec ID, dimension, sévérité, observation, reco, date, `Status: pending`.
 2. **Double-check** (`/maintainability double-check <ID>`) → ajoute une section `Double-check (date)` dans l'entrée existante. Peut amender la reco. Peut révéler un changement de sévérité (proposer à l'utilisateur, valider, puis amender l'attribut).
 3. **Résolution intra-session** → quand l'utilisateur applique un fix dans la conversation qui suit un audit ou un double-check, le skill **propose** de marquer résolu :
-  - Déplace l'entrée en `## Resolved`
-  - Ajoute `(résolu YYYY-MM-DD)` dans le titre
-  - Ajoute bullet `Resolution: <description courte du fix>. Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` sur la zone du fix, ou comptage direct sur les fichiers touchés). Si le fix est dans le même tour de conversation : faire la mesure tout de suite.
-  - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix
+  - Déplace l'entrée en `## Resolved` au **format compact** (cf. *Format compact d'une entrée résolue*) — Observation, Reco, Δ initial, Status, Double-check sont droppés.
+  - Ajoute `(résolu YYYY-MM-DD)` dans le titre.
+  - La bullet `Resolution` contient : description courte du fix + `Δ LoC mesuré : <valeur>` (mesurer via `git diff --stat` ou comptage direct ; faire la mesure dans le tour de conversation si possible) + `Commit : <hash>` du commit qui applique le fix.
+  - Met à jour la ligne history correspondante : `(résolus DUP-007)` → `(résolus DUP-007+SIZ-003)` si plus d'un fix.
 4. **Update** (`/maintainability update`) → re-vérifie chaque pending :
   - Pattern toujours présent → status inchangé.
-  - Pattern absent → `Resolution: détecté résolu lors de update (YYYY-MM-DD)`. Bascule en Resolved.
+  - Pattern absent → bascule en Resolved au format compact (cf. étape 3) ; `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD)` + Δ mesuré + `Commit : <hash>` si identifiable via `git log`.
   - Fichier disparu / déplacé → `Status: stale`. Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, ou archiver).
 5. **Archivage automatique** → après chaque move vers `## Resolved` (étapes 3, 4, ou *Cas NO-GO en autonomie* du mode audit) :
   - Compter les entrées de la section `## Resolved` du fichier findings.
-  - Si > 10 : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte à 10. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).
+  - Si > cap (cf. *Format des fichiers projet > maintainability_findings.md*) : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte au cap. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).
   - Si l'archive n'existe pas, la créer à la volée avec le header `# Maintainability resolved archive\n\n` puis appender l'entrée.
   - Append en fin d'archive (l'ordre d'archivage = ordre chronologique des résolutions).
-  - L'entrée est déplacée intacte (pas de compaction du contenu).
+  - L'entrée est déplacée intacte (la compaction a déjà eu lieu au move vers `## Resolved`).
   - Le header `<!-- id_counters: ... -->` du fichier findings n'est pas affecté (les IDs restent monotonement croissants ; cf. *Compteur d'IDs*).
 
 ## Edge cases
