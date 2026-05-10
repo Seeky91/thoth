@@ -77,7 +77,7 @@ Calculer à chaque audit (jamais persisté). Algorithme :
 ### C. Sélection (mode auto, args vides)
 
 1. **Lire le rolling** dans `maintainability_history.md` (parser les lignes `- YYYY-MM-DD — <zone> — …` et extraire la zone).
-2. Calculer `N = clamp(round(Z / 4), 3, 8)` (override possible via `<!-- rolling_size: M -->` en tête de history, voir *Format des fichiers projet*).
+2. Calculer `N = clamp(round(Z / 4), 3, 10)` (override possible via `<!-- rolling_size: M -->` en tête de history, voir *Format des fichiers projet*).
 3. **Candidats** = `inventaire - rolling` (les `N` derniers).
 4. **Pondération** :
   - Zones jamais auditées (n'apparaissant dans aucune ligne du history actuel) → priorité haute.
@@ -537,7 +537,7 @@ Deux fichiers vivent dans `<projet>/.claude/`. Le skill les crée/lit/écrit. Fo
 
 ### `.claude/maintainability_history.md`
 
-Une ligne par audit. Taille adaptative `N = clamp(round(Z / 4), 3, 8)` où `Z` est le nombre de zones inventoriées au moment de l'écriture. Au write-time, recalcule N et trim le surplus du plus ancien.
+Une ligne par audit. Taille adaptative `N = clamp(round(Z / 4), 3, 10)` où `Z` est le nombre de zones inventoriées au moment de l'écriture. Au write-time, recalcule N et trim le surplus du plus ancien.
 
 ```markdown
 <!-- rolling_size: 5 -->        # commentaire optionnel : override manuel
@@ -553,7 +553,7 @@ Règles :
 - Format ligne : `- YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (status)`
 - `<zone>` = chemin dossier (`services/billing/refund/`), chemin fichier (`core/api_handler.py`), ou `pipeline:<nom> [fichiers,…]` (le bracket fichiers n'apparaît QUE pour les pipelines).
 - `(status)` : `(pending)`, `(résolus tous)`, ou `(résolus <ID>+<ID>+...)` quand certains seulement sont résolus.
-- Si `<!-- rolling_size: N -->` est présent en tête de fichier, **respecter cette valeur** au lieu du calcul auto, même si elle tombe hors `[3, 8]`. L'utilisateur sait ce qu'il veut ; le skill ne discute pas la valeur.
+- Si `<!-- rolling_size: N -->` est présent en tête de fichier, **respecter cette valeur** au lieu du calcul auto, même si elle tombe hors `[3, 10]`. L'utilisateur sait ce qu'il veut ; le skill ne discute pas la valeur.
 
 ### `.claude/maintainability_findings.md`
 
