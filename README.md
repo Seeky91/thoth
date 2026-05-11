@@ -89,7 +89,7 @@ Le skill `maintainability` expose une famille de slash commands, une par mode. C
 
 * Re-vérifie tous les findings `pending`
 * Marque ceux qui sont résolus
-* Détecte les fichiers déplacés (`stale` ou `stale-after-<ID>` si déjà tagué par la cascade)
+* **Self-heal sur les fichiers déplacés** : investigation auto via git history / lecture de diff / recherche pattern — auto-relocate si le pattern est retrouvé ailleurs, auto-résolu si dissout, ou tag `stale` / `stale-after-<ID>` + arbitrage utilisateur si signaux insuffisants
 
 ---
 

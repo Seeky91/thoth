@@ -41,7 +41,7 @@ Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La 
 ### Edge cases
 
 - **Cascade qui résout un autre item du batch en cours** (cas `fix B<n>`) : si le re-check post-fix de l'item #1 résout DUP-008 et que DUP-008 est l'item #2 du batch → skip DUP-008 dans la suite avec annonce *"DUP-008 déjà résolu collatéralement par DUP-007, skip."*
-- **`update` rencontre un `stale-after-<ID>` existant** : laisser tel quel, ne pas remplacer par un `stale` générique — l'info de cause est plus précieuse.
+- **`update` rencontre un `stale-after-<ID>` existant** : passe par l'investigation self-heal (cf. SKILL.md > Mode update > étape 2.b) — le commit primaire est connu, signal direct. Trois issues possibles : auto-relocalisation (pattern retrouvé ailleurs), auto-résolution (pattern dissout par le fix primaire), ou préservation du tag `stale-after-<ID>` si l'investigation est inconclusive. Dans ce dernier cas, **ne pas remplacer** par un `stale` générique — l'info de cause reste plus précieuse.
 
 ### Idempotence et borne de coût
 

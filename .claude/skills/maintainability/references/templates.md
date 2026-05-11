@@ -106,15 +106,17 @@ Update terminé — <projet>
 
 Re-vérifié <N> pendings :
   Résolus (<n>) : <ID-1>, <ID-2>
+  Auto-relocalisés (<n>) : <ID> (<old-path> → <new-path>, <signal>)
+  Auto-résolus stale (<n>) : <ID> (<raison : pattern dissout / commit <hash>>)
   Toujours présents (<n>) : <ID-3>, <ID-4>, <ID-5>
-  Stale (<n>) : <ID> (<raison>)
+  Stale (<n>) : <ID> (<raison investigation inconclusive>)
   Stale-after (<n>) : <ID> (stale-after-<ID-cause> préservé)
   Archivés (<n>) : <ID-1>, <ID-2> (cap Resolved atteint)
 
 Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md[, .claude/maintainability_resolved_archive.md].
 ```
 
-Lignes à 0 : omises (e.g. pas de stale-after → pas de ligne).
+Lignes à 0 : omises (e.g. pas de stale-after → pas de ligne, pas d'auto-relocalisé → pas de ligne).
 
 ## `double-check:output` — Sortie standard d'un double-check
 

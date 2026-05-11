@@ -84,8 +84,8 @@ Source de vérité des findings. Deux sections (`## Pending`, `## Resolved`) plu
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
 - **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check). Valeurs de `Status` :
   - `pending` (initial),
-  - `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable),
-  - `stale-after-<ID> (YYYY-MM-DD) — <raison>` (posé par la cascade quand le fix de `<ID>` invalide la localisation).
+  - `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable **et** l'investigation self-heal est inconclusive ; cf. SKILL.md > Mode update > étape 2.b),
+  - `stale-after-<ID> (YYYY-MM-DD) — <raison>` (posé par la cascade quand le fix de `<ID>` invalide la localisation ; peut être résolu ou relocalisé au prochain `update` par self-heal).
 - **Resolved** — format compact à 3 bullets : Dimension, Resolution, Audit origin. Voir *Format compact d'une entrée résolue* ci-dessous.
 - L'ID est immuable. Tout autre attribut peut être amendé.
 - Le header `<!-- id_counters: PREFIX=N, ... -->` cache les compteurs d'IDs pour assignation rapide (cf. *Compteur d'IDs*). Absent dans un fichier fraîchement bootstrappé ; ajouté à la première assignation d'ID.
@@ -167,7 +167,7 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
 4. **Update** (`/maintainability-update`) → re-vérifie chaque pending :
    - Pattern toujours présent → status inchangé.
    - Pattern absent → bascule en Resolved au format compact ; `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD)` + Δ mesuré + `Commit : <hash>` si identifiable via `git log`.
-   - Fichier disparu / déplacé → `Status: stale` (sauf si `stale-after-<ID>` est déjà posé par la cascade : préservé, pas écrasé). Demande à l'utilisateur de confirmer (rouvrir avec nouveau path, marquer résolu, ou archiver).
+   - Fichier disparu / déplacé → **investigation self-heal** (cf. SKILL.md > Mode update > étape 2.b). Trois issues : pattern retrouvé ailleurs → relocalisation 1-touch ; pattern dissout → résolu auto avec commit cité ; signaux insuffisants → `Status: stale` (ou préservation de `stale-after-<ID>` posé par la cascade) puis arbitrage utilisateur.
 5. **Archivage automatique** → après chaque move vers `## Resolved` (étapes 3, 4, ou *Cas NO-GO en autonomie* du mode audit) :
    - Compter les entrées de la section `## Resolved` du fichier findings.
    - Si > cap (8) : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte au cap. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).
