@@ -1,0 +1,203 @@
+# Templates de sortie chat
+
+Référence chargée par SKILL.md avant chaque sortie chat d'un mode. Les modes citent un template par nom (e.g. `audit:summary`) ; ce fichier en donne le format normatif. Les conventions transverses (header, trailer, séparation récap / proposition d'action) sont définies dans SKILL.md — pas répétées ici.
+
+Suivre ces templates **à la lettre** (structure, headers, trailers, placeholders). Le contenu des placeholders s'adapte au contexte, mais l'ossature ne change pas. Garde-fou contre la dérive de format d'une invocation à l'autre.
+
+## `selection:proposition` — Annonce de la zone candidate (mode audit auto)
+
+```
+Je propose : <zone> (<motif>, <taille LoC>)
+Alternatives : <zone-alt-1> (<motif>, <taille>) ou <zone-alt-2> (<motif>, <taille>)
+```
+
+- `<motif>` ∈ {`jamais auditée`, `god file`, `pipeline traçable`, etc.}
+- 2 alternatives par défaut. Si l'inventaire en propose moins, lister celles disponibles.
+
+## `audit:summary` — Audit avec findings
+
+```
+Audit terminé — <zone>
+
+<N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
+  <ID> (<SEV>, Δ ~<delta>) — <observation-courte>
+  ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
+
+Δ LoC total estimé si tout est appliqué : ~<sum>.
+
+Files mis à jour : .claude/maintainability_findings.md (+<N> findings), .claude/maintainability_history.md (+1 ligne).
+Pour creuser un item à la main : /maintainability-double-check <ID-exemple>.
+```
+
+Suivi du bloc `audit:proposition` ou `audit:proposition-min` selon le nombre de findings.
+
+## `audit:clean` — Audit zone propre (0 findings)
+
+```
+Audit terminé — <zone>. Aucun finding produit, zone propre sur toutes les dimensions examinées.
+
+Files mis à jour : .claude/maintainability_history.md (+1 ligne `0 findings (clean)`).
+```
+
+Pas de bloc de proposition derrière (rien à proposer).
+
+## `audit:proposition` — Proposition de double-check autonome (3 options)
+
+```
+Tu peux aussi me laisser creuser en autonomie. Sur quoi ?
+  (a) un panel de quick-wins : <ID-1>, <ID-2>, <ID-3> — <K> findings au fix court et peu de blast radius.
+  (b) le finding le plus structurant : <ID-heavy> — <résumé observation>.
+  (c) rien, je verrai plus tard.
+```
+
+Si aucun quick-win ne tient les critères : omettre (a). Si aucun HIGH/MED structurant : (b) prend le plus grand `|Δ LoC|` avec avertissement *"(pas un finding lourd au sens classique)"*.
+
+## `audit:proposition-min` — Variante 1 ou 2 findings
+
+```
+Veux-tu que je fasse un double-check autonome sur <ID> ?
+```
+
+Si 2 findings : citer les deux IDs.
+
+## `list:dashboard` — Tableau de bord (read-only)
+
+```
+Maintainability board — <projet>
+
+Pending (<total>) :
+  HIGH (<n>) : <ID-1> (<desc-50char>), <ID-2> (<desc>), …
+  MED  (<n>) : <ID> (<desc>), …
+  LOW  (<n>) : <ID> (<desc>), …
+
+Stale (<n>) — à relocaliser, marquer résolu, ou archiver :
+  <ID> — stale-after-<ID-cause> (fix du <date>, localisation invalidée)
+  <ID> — stale (<raison>)
+
+Recently resolved (30 derniers j.) :
+  <ID> (<SEV>) — <date> — <résumé-fix>
+
+Rolling (N=<N>) :
+  <date> — <zone> — <N findings (status)>
+  ... (N lignes, les plus récentes en premier)
+
+Batches suggérés (<K>) :
+
+  B1 · <zone-ou-multi> · Δ ~<sum> · <K> findings  [★ recommandé : <raison>]
+       <ID·SEV> + <ID·SEV> + … — <rationale 1 ligne>
+
+  B2 · <zone> · Δ ~<sum> · <K> findings
+       <ID·SEV> + … — <rationale>
+
+Je propose `double-check B<reco>` (recommandé).
+Sinon : `fix B<reco>` direct, un autre batch (`double-check B<n>` / `fix B<n>`), ou `rien`.
+```
+
+Omissions :
+- Section Stale : omise si zéro.
+- Section Recently resolved : afficher *"Aucun résolu dans les 30 derniers jours."* si zéro.
+- Section Batches : si zéro batch détecté, remplacer par *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt d'action.
+- Si zéro pending actif : remplacer la ligne par `Pending actifs (0) : aucun finding actionnable.`.
+
+## `update:summary` — Récap update
+
+```
+Update terminé — <projet>
+
+Re-vérifié <N> pendings :
+  Résolus (<n>) : <ID-1>, <ID-2>
+  Toujours présents (<n>) : <ID-3>, <ID-4>, <ID-5>
+  Stale (<n>) : <ID> (<raison>)
+  Stale-after (<n>) : <ID> (stale-after-<ID-cause> préservé)
+  Archivés (<n>) : <ID-1>, <ID-2> (cap Resolved atteint)
+
+Files mis à jour : .claude/maintainability_findings.md, .claude/maintainability_history.md[, .claude/maintainability_resolved_archive.md].
+```
+
+Lignes à 0 : omises (e.g. pas de stale-after → pas de ligne).
+
+## `double-check:output` — Sortie standard d'un double-check
+
+```
+Double-check <ID> — <verdict>
+
+Localisation : <path:line>
+Blast radius : <N> imports, <N> tests touchés, <surfaces>
+Faisabilité : <résumé>
+Effort : <S|M|L> (~<estimation temps/commits>)
+Δ LoC affiné : ~<delta> (<comparaison estimation initiale si écart >50%>)
+Reco affinée : <reco>
+Verdict : <GO|NO-GO|GO-mais-après-X>
+Apport : <phrase concrète> (uniquement si verdict GO ou GO-mais-après-X)
+
+[Extraits de code des call sites pertinents si utiles à la décision]
+
+Files mis à jour : .claude/maintainability_findings.md (section Double-check ajoutée[, titre amendé : <SEV> → <NEW-SEV>]).
+```
+
+## `double-check:autonomous-batch` — Sortie agrégée d'un panel quick-wins ou batch fix
+
+```
+Double-check autonome terminé sur <K> <findings|quick-wins> :
+  <ID-1> — <verdict> (Δ <delta>, <résumé-1-ligne>) — Apport : <phrase>
+  <ID-2> — <verdict> (Δ <delta>, <résumé>) — Apport : <phrase>
+  <ID-3> — <verdict> (Δ <delta>, <résumé>) [pas d'Apport si NO-GO]
+
+Files mis à jour : .claude/maintainability_findings.md (+<K> sections Double-check).
+```
+
+## `resolution:confirm` — Confirmation intra-session (avec ou sans cascade)
+
+**Variante simple (overlap = 0, pas de cascade)** :
+```
+Ce fix résout <ID-primaire> (Δ <delta>). Je marque comme résolu ?
+```
+
+**Variante avec cascade** :
+```
+Ce fix résout <ID-primaire> (Δ <delta>). Cascade re-check sur <K> pendings touchant les mêmes fichiers :
+  - <ID-cascade-1> — pattern absent → résolu collatéralement
+  - <ID-cascade-2> — pattern toujours présent (l. <ancien> → <nouveau>, à mettre à jour)
+  - <ID-cascade-3> — <fichier> renommé → stale-after-<ID-primaire>
+
+Je marque <ID-primaire>[+ <IDs-cascadés>] résolus[, mets à jour <IDs-shift>][, et tag <IDs-stale> stale-after] ?
+```
+
+## `resolution:done` — Confirmation finale intra-session
+
+```
+Files mis à jour : .claude/maintainability_findings.md (move <ID> → Resolved[+ <N> cascadés][+ <M> stale-after]), .claude/maintainability_history.md (résolus <ID>+...).
+```
+
+Si push-back partiel à l'étape `resolution:confirm` : la ligne reflète seulement ce qui a été appliqué.
+
+## `cascade:recap-batch` — Récap final d'un `fix B<n>` (mode list)
+
+```
+<X>/<Y> résolus, Δ LoC total mesuré : <sum>, commits : <hash1>+<hash2>+...
+Cascade re-check : <N> résolu(s) collatéralement (<IDs>), <M> stale-after (<IDs>).
+```
+
+Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est **omise**.
+
+## `archive-clear:confirm-all` — Confirmation purge totale
+
+```
+Confirme la suppression totale de l'archive (<X> entrées). Tape 'oui' pour confirmer.
+```
+
+Attend "oui" littéral. Tout autre input → annoncer *"Annulé."* et terminer sans écrire.
+
+## `archive-clear:confirm-partial` — Confirmation purge partielle
+
+```
+<X> entrées seront supprimées, <Y> conservées (la plus récente : <ID> du <date>). Confirmer ? (y/N)
+```
+
+## `archive-clear:done` — Récap purge
+
+```
+Archive clearée — <X> supprimées, <Y> conservées. Compteurs : DUP=<n>, SIZ=<n>, ...
+
+Files mis à jour : .claude/maintainability_resolved_archive.md[, .claude/maintainability_findings.md (header id_counters)].
+```

@@ -10,9 +10,10 @@ Audit de maintenabilité ciblé avec :
 
 * suivi des findings via des IDs stables
 * état persistant par projet (`.claude/`)
-* rotation automatique des zones auditées (rolling coverage)
+* historique d'audits **append-only** : le rolling à éviter (N dernières zones) est une vue sur le journal, la couverture historique scanne le fichier entier — pas de zone re-proposée par perte de mémoire après quelques audits
 * re-vérification et approfondissement des problèmes
 * re-vérification en cascade automatique après chaque fix (les findings dont la localisation chevauche le diff sont rechecké, marqués résolus collatéralement, ou taggés `stale-after`)
+* sorties chat normalisées via templates nommés (`audit:summary`, `list:dashboard`, `resolution:confirm`, …) — forme stable d'une invocation à l'autre
 
 Permet de détecter et suivre la dette de maintenabilité dans le temps sans repasser toujours sur les mêmes zones.
 
@@ -20,12 +21,21 @@ Permet de détecter et suivre la dette de maintenabilité dans le temps sans rep
 
 ## Installation
 
-Depuis la racine de ce dépôt, copier les fichiers dans votre dossier Claude :
+Depuis la racine de ce dépôt :
+
+```bash
+make install     # sync repo → ~/.claude (skill + slash commands)
+make diff        # voir ce qui diffère entre repo et ~/.claude
+make uninstall   # retirer le skill + ses commands de ~/.claude (avec confirmation)
+```
+
+Le skill est composé d'un `SKILL.md` (hub de contrôle) et de trois fichiers de référence chargés à la demande (`references/file-formats.md`, `references/cascade.md`, `references/templates.md`). Le `make install` copie l'ensemble dans `~/.claude/skills/maintainability/` et les slash commands dans `~/.claude/commands/` (sync via `rsync`, avec `--delete` côté skill pour garantir que `~/.claude` reflète exactement le repo).
+
+Si tu préfères installer à la main :
 
 ```bash
 mkdir -p ~/.claude/skills/maintainability ~/.claude/commands
-
-cp .claude/skills/maintainability/SKILL.md ~/.claude/skills/maintainability/
+cp -r .claude/skills/maintainability/SKILL.md .claude/skills/maintainability/references ~/.claude/skills/maintainability/
 cp .claude/commands/maintainability*.md ~/.claude/commands/
 ```
 
