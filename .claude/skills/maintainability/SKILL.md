@@ -182,11 +182,25 @@ Après le résumé en chat, si l'audit a produit ≥ 1 finding, proposer trois o
 
 **Exécution selon le choix utilisateur** :
 
-- **(a) Quick-wins** : pour chaque finding du panel, exécuter le flux *Mode : double-check* (lecture du fichier, trace, blast radius, Δ LoC affiné, reco affinée, verdict). Écrire la section `Double-check (date)` dans chaque entrée du fichier findings. **Sortie agrégée en un seul message** via le template `double-check:autonomous-batch`.
-- **(b) Heavy finding** : exécuter le flux *Mode : double-check* sur le finding sélectionné. Sortie complète via le template `double-check:output` standard.
+- **(a) Quick-wins** : pour chaque finding du panel, exécuter le flux *Mode : double-check* (lecture du fichier, trace, blast radius, Δ LoC affiné, reco affinée, verdict). Écrire la section `Double-check (date)` dans chaque entrée du fichier findings. **Sortie agrégée** via `double-check:autonomous-batch`, suivie de `double-check:autonomous-batch-proposition` (cf. *I. Action post-proposition batch* ci-dessous).
+- **(b) Heavy finding** : exécuter le flux *Mode : double-check* sur le finding sélectionné. Sortie complète via `double-check:output` standard, suivie de `double-check:proposition` (cf. *Mode : double-check > Action selon le choix utilisateur*).
 - **(c) Rien** : terminer la commande. Aucune écriture supplémentaire.
 
-**Cas NO-GO en autonomie** : si une exécution autonome conclut NO-GO sur un finding et que l'utilisateur le confirme dans la foulée, marquer dans Resolved avec `Resolution: archivé après double-check (NO-GO motivé : <raison>)` plutôt que de le laisser en pending indéfiniment.
+### I. Action post-proposition batch
+
+Déclenché par la proposition `double-check:autonomous-batch-proposition` (suite à `(a) Quick-wins` ci-dessus ou à `double-check B<n>` depuis *Mode : list*). Selon le choix utilisateur :
+
+- **Fix tous les GO** :
+  1. Établir l'ordering (règles dans `references/templates.md > double-check:autonomous-batch-proposition`).
+  2. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée`.
+  3. Plan global affiché, OK explicite. Si OK, exécuter dans l'ordre.
+  4. Avant chaque marquage `Resolution`, lancer la suite de tests. Tests OK → flux résolution intra-session. Tests KO → arrêt, ne pas marquer.
+  5. Cascade re-check automatique après chaque résolution (cf. `references/cascade.md`).
+  6. Si variante mix GO+NO-GO : archiver les NO-GO restants dans la foulée (move Pending → Resolved compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, lignes history complétées, cap Resolved respecté).
+  7. Récap final via `cascade:recap-batch`.
+- **Fix un seul** : étapes 2-5 ci-dessus sur le finding choisi.
+- **Archiver les NO-GO** (variante mix, archive partielle) ou **Archiver tous** (variante tous NO-GO) : pour chaque NO-GO, move Pending → Resolved au format compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, ligne history complétée. Cap Resolved respecté.
+- **Rien** / **Garder pending** : terminer sans écriture supplémentaire.
 
 ## Mode : list
 
@@ -234,7 +248,7 @@ Si aucun batch ne se distingue (≥ 2 batches strictement équivalents sur les 4
 
 **Action selon la réponse utilisateur** :
 
-- **`double-check B<n>`** : exécuter le flux *Mode : double-check* sur chaque finding du batch dans l'ordre. Sortie agrégée via `double-check:autonomous-batch`.
+- **`double-check B<n>`** : exécuter le flux *Mode : double-check* sur chaque finding du batch dans l'ordre. Sortie agrégée via `double-check:autonomous-batch`, suivie de `double-check:autonomous-batch-proposition`. Action selon choix utilisateur : cf. *Mode : audit > I. Action post-proposition batch*.
 - **`fix B<n>`** (l'exécution applique systématiquement les checkpoints décrits ci-dessous — l'utilisateur n'a pas à le préciser) :
   1. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée` si présente, sinon `Reco`.
   2. Afficher le plan global, demander un OK explicite. Si OK, exécuter dans l'ordre.
@@ -321,7 +335,19 @@ Si la sévérité change : modifier également le titre de l'entrée (`### SIZ-0
 
 ### Sortie
 
-Utiliser le template `double-check:output`.
+1. Récap du verdict via le template `double-check:output`.
+2. Proposition d'action via le template `double-check:proposition` (variante filtrée selon verdict GO/GO-mais-après-X vs NO-GO).
+
+### Action selon le choix utilisateur
+
+- **Fix maintenant** (verdict GO / GO-mais-après-X) :
+  1. Plan (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée`.
+  2. Plan affiché, OK explicite. Si OK, exécuter.
+  3. Avant le marquage `Resolution`, lancer la suite de tests (détectée via marqueurs : `cargo test`, `npm test`, `pytest`, `go test ./...` ; sinon demander la commande). Tests OK → flux résolution intra-session (cf. *Mode : update > Détection intra-session*). Tests KO → arrêt, ne pas marquer.
+  4. Cascade re-check automatique (cf. `references/cascade.md`).
+  5. Récap final via `resolution:done`.
+- **Archiver** (verdict NO-GO) : move Pending → Resolved au format compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`. Compléter la ligne history correspondante. Cap Resolved respecté (cf. `references/file-formats.md > Cycle de vie d'un finding` étape 5).
+- **Plus tard** / **Garder pending** : terminer sans écriture supplémentaire. Le Double-check (date) est déjà persisté.
 
 ## Mode : archive-clear
 
@@ -446,7 +472,7 @@ Les sorties chat des modes suivent des templates normatifs définis dans `refere
 **Conventions transverses** (résumé) :
 - **Header** des modes écrivant : `<Mode> terminé — <scope>`. Mode list utilise `Maintainability board — <projet>`.
 - **Trailer** « Files mis à jour : … » : présent à chaque mode qui écrit (audit, update, double-check, archive-clear, résolution intra-session). Absent du mode list (read-only).
-- Les blocs de proposition d'action utilisateur (post-audit, post-list) sont distincts du récap — bloc séparé en fin de message.
+- Les blocs de proposition d'action utilisateur (post-audit, post-double-check single, post-double-check batch, post-list) sont distincts du récap — bloc séparé en fin de message.
 
 **Liste des templates disponibles** (cf. `references/templates.md` pour le format de chacun) :
 
@@ -461,6 +487,8 @@ Les sorties chat des modes suivent des templates normatifs définis dans `refere
 | `update:summary` | Récap en mode update. |
 | `double-check:output` | Sortie standard d'un double-check. |
 | `double-check:autonomous-batch` | Sortie agrégée d'un panel quick-wins ou batch fix. |
+| `double-check:proposition` | Proposition d'action après un double-check simple (filtrée selon verdict). |
+| `double-check:autonomous-batch-proposition` | Proposition d'action après un batch double-check (filtrée selon mix de verdicts). |
 | `resolution:confirm` | Confirmation intra-session (variante simple ou avec cascade). |
 | `resolution:done` | Confirmation finale après résolution intra-session. |
 | `cascade:recap-batch` | Récap final d'un `fix B<n>` (mode list). |
@@ -485,6 +513,8 @@ Une case **non applicable** au cas courant (ex. cap Resolved pas dépassé donc 
 
 - Section `Double-check (YYYY-MM-DD) :` ajoutée à l'entrée du finding ciblé.
 - Si reclassification de sévérité validée : titre `### <ID> — <NEW-SEV> — …` modifié.
+- Si l'utilisateur a choisi *Fix maintenant* à la proposition : invariants de *Résolution intra-session* applicables (cf. ci-dessous).
+- Si l'utilisateur a choisi *Archiver* (NO-GO) : entrée déplacée Pending → Resolved au format compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, ligne history correspondante complétée, cap Resolved respecté.
 
 ### Update
 

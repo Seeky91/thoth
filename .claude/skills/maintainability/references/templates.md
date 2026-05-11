@@ -146,6 +146,60 @@ Double-check autonome terminé sur <K> <findings|quick-wins> :
 Files mis à jour : .claude/maintainability_findings.md (+<K> sections Double-check).
 ```
 
+## `double-check:proposition` — Proposition d'action après double-check simple
+
+Affiché juste après `double-check:output`. Options filtrées selon le verdict.
+
+**Variante verdict GO / GO-mais-après-X** :
+```
+Que faire pour <ID> ?
+  (a) Fix maintenant — plan + tests + résolution intra-session.
+  (b) Plus tard — le Double-check est écrit, tu pourras y revenir via /maintainability-list.
+```
+
+**Variante verdict NO-GO** :
+```
+Verdict NO-GO. Que faire pour <ID> ?
+  (a) Archiver — marquer résolu avec motif `archivé après double-check (NO-GO : <raison-courte>)`.
+  (b) Garder pending — utile si le NO-GO mérite re-statuation plus tard.
+```
+
+## `double-check:autonomous-batch-proposition` — Proposition d'action après batch double-check
+
+Affiché juste après `double-check:autonomous-batch`. Options filtrées selon le mix de verdicts du batch.
+
+**Variante mix GO + NO-GO** :
+```
+Que faire des <K> findings double-checkés ?
+  (a) Fix tous les GO dans l'ordre : <ID-GO-1> → <ID-GO-2> → … (raison : <critère>). Archive auto des NO-GO : <ID-NG-1>, <ID-NG-2>.
+  (b) Fix un seul GO — précise lequel parmi <liste-GO>.
+  (c) Archiver les NO-GO seulement, garder les GO pending.
+  (d) Rien.
+```
+
+**Variante tous GO** :
+```
+Que faire des <K> findings (tous GO) ?
+  (a) Fix tous dans l'ordre : <ID-1> → <ID-2> → … (raison : <critère>).
+  (b) Fix un seul — précise lequel parmi <liste>.
+  (c) Rien.
+```
+
+**Variante tous NO-GO** :
+```
+Les <K> findings sont tous NO-GO. Que faire ?
+  (a) Archiver tous (motif individuel par finding).
+  (b) Garder pending.
+```
+
+**Règles d'ordering pour l'option « Fix tous »** (variantes mix et tous GO), par priorité décroissante :
+1. **Dépendances explicites** : un verdict `GO-mais-après-<ID>` impose que `<ID>` soit fixé avant, **si** `<ID>` est dans le batch (sinon noter la dépendance externe et placer le finding dans l'ordre naturel).
+2. **Blast radius croissant** : les findings au blast radius le plus contenu d'abord (moins de risque de casser le suivant).
+3. **Path partagé** : regrouper les findings touchant le même fichier (une seule série de changements par fichier).
+4. **Tie-break** : ID croissant.
+
+La raison citée dans la sortie reprend le critère qui a tranché (ex. `couplage explicite`, `blast radius bas d'abord`, `regroupement par fichier`).
+
 ## `resolution:confirm` — Confirmation intra-session (avec ou sans cascade)
 
 **Variante simple (overlap = 0, pas de cascade)** :
