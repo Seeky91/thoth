@@ -11,8 +11,12 @@ Je propose : <zone> (<motif>, <taille LoC>)
 Alternatives : <zone-alt-1> (<motif>, <taille>) ou <zone-alt-2> (<motif>, <taille>)
 ```
 
-- `<motif>` ∈ {`jamais auditée`, `god file`, `pipeline traçable`, etc.}
-- 2 alternatives par défaut. Si l'inventaire en propose moins, lister celles disponibles.
+- `<motif>` reflète à la fois la nature de la zone et son état d'activité (cf. SKILL.md > Mode audit > C. *Signal d'activité*) :
+  - **Couverture** : `jamais auditée`, `god file`, `pipeline traçable`.
+  - **Activité** : `chaude — <N> commits depuis le dernier audit (YYYY-MM-DD)`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`.
+  - Les deux peuvent se combiner : `pipeline traçable, chaud — 12 commits depuis 2026-03-08`.
+  - En mode dégradé (repo non-git) : omettre toute mention d'activité, ne garder que le motif de couverture.
+- 2 alternatives par défaut. Si l'inventaire en propose moins, lister celles disponibles. Idéalement, montrer un mélange (une zone du niveau de priorité retenu + une d'un niveau différent pour donner du choix à l'utilisateur).
 
 ## `audit:summary` — Audit avec findings
 
@@ -60,6 +64,45 @@ Veux-tu que je fasse un double-check autonome sur <ID> ?
 
 Si 2 findings : citer les deux IDs.
 
+## `crosscut:dim-proposition` — Annonce de la dimension candidate (mode crosscut)
+
+```
+Je propose un crosscut sur : <DIM> (<motif>)
+Alternatives : <DIM-alt-1> (<motif>) ou <DIM-alt-2> (<motif>)
+```
+
+- `<motif>` ∈ {`jamais crosscutée`, `non vue depuis Nj`, `signal fort sur <zones>`, `aléatoire pondéré`, etc.}
+- 2 alternatives par défaut, parmi les éligibles `{DUP, INC, DRF, DED, BND}` hors `<DIM>` proposé. Si moins disponible (rolling restrictif), lister celles disponibles.
+
+## `crosscut:summary` — Crosscut avec findings
+
+```
+Crosscut <DIM> terminé
+
+<N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
+  <ID> (<SEV>, Δ ~<delta>, <K> fichiers) — <observation-courte>
+  ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
+
+Δ LoC total estimé si tout est appliqué : ~<sum>.
+
+Files mis à jour : .claude/maintainability_findings.md (+<N> findings), .claude/maintainability_history.md (+1 ligne `crosscut:<DIM>`).
+Pour creuser un item à la main : /maintainability-double-check <ID-exemple>.
+```
+
+`<K> fichiers` = nombre d'emplacements distincts listés dans la `Localisation` du finding (1 pour un finding mono-fichier comme `DED` global, ≥2 pour `DUP`/`INC`/`DRF`/`BND`).
+
+Suivi du bloc `audit:proposition` ou `audit:proposition-min` selon le nombre de findings (les templates de proposition d'action sont génériques sur la nature de l'audit — pas de version dédiée crosscut).
+
+## `crosscut:clean` — Crosscut sans finding
+
+```
+Crosscut <DIM> terminé. Aucun finding cross-zone produit sur cette dimension.
+
+Files mis à jour : .claude/maintainability_history.md (+1 ligne `crosscut:<DIM> — 0 findings (clean)`).
+```
+
+Pas de bloc de proposition derrière (rien à proposer).
+
 ## `list:dashboard` — Tableau de bord (read-only)
 
 ```
@@ -81,6 +124,10 @@ Rolling (N=<N>) :
   <date> — <zone> — <N findings (status)>
   ... (N lignes, les plus récentes en premier)
 
+Rolling crosscut (Nx=<Nx>) :
+  <date> — crosscut:<DIM> — <N findings (status)>
+  ... (Nx lignes max, les plus récentes en premier)
+
 Batches suggérés (<K>) :
 
   B1 · <zone-ou-multi> · Δ ~<sum> · <K> findings  [★ recommandé : <raison>]
@@ -98,6 +145,7 @@ Omissions :
 - Section Recently resolved : afficher *"Aucun résolu dans les 30 derniers jours."* si zéro.
 - Section Batches : si zéro batch détecté, remplacer par *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt d'action.
 - Si zéro pending actif : remplacer la ligne par `Pending actifs (0) : aucun finding actionnable.`.
+- Section `Rolling crosscut` : omise entièrement si aucune ligne `crosscut:*` dans l'history. Si moins de `Nx` lignes crosscut existent, lister celles disponibles (pas de padding).
 
 ## `update:summary` — Récap update
 

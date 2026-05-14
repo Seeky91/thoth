@@ -1,6 +1,6 @@
 ---
 name: maintainability
-description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline.
+description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, wants to detect cross-zone consistency issues (drift between modules, duplicated helpers across the project, globally dead exports, boundary violations), asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline.
 ---
 
 # Maintainability skill
@@ -10,6 +10,7 @@ description: Use when the user invokes `/maintainability`, asks for a maintainab
 Famille de slash commands :
 
 - `/maintainability` — audit (auto si pas d'arg, forcé si `<path>` fourni)
+- `/maintainability-crosscut` — sweep cross-zone sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`), dimension auto-proposée
 - `/maintainability-list` — tableau de bord, lecture seule
 - `/maintainability-update` — re-vérification de tous les pendings
 - `/maintainability-double-check <ID>` — deep-dive sur un finding existant
@@ -24,6 +25,8 @@ Ce SKILL.md est le hub de contrôle. Les détails normatifs vivent dans :
 - `references/file-formats.md` — format des trois fichiers d'état (`maintainability_history.md`, `maintainability_findings.md`, `maintainability_resolved_archive.md`), compteur d'IDs, cycle de vie d'un finding, cap Resolved.
 - `references/cascade.md` — algorithme détaillé de la re-vérification en cascade post-fix.
 - `references/templates.md` — templates normatifs des sorties chat (un par usage, e.g. `audit:summary`, `list:dashboard`, `resolution:confirm`). **Lire avant chaque sortie chat** d'un mode pour garder la forme stable d'une invocation à l'autre.
+- `references/dimensions.md` — catalogue des 11 dimensions seed (`DUP`, `CPX`, `SIZ`, `DED`, `INC`, `IDM`, `BND`, `DRF`, `TST`, `CFG`, `DOC`) et cadrage de la dimension `IDM`. **Lire avant la production d'un finding** quand le préfixe ou le cadrage de la dimension n'est pas immédiatement évident.
+- `references/quality.md` — grille de sévérité (HIGH/MED/LOW), garde-fous anti-bruit (*"Quand ne PAS produire de finding"*), et convention `Δ LoC`. **Lire avant la production d'un finding** : ces calibrations conditionnent la décision même d'écrire ou pas.
 
 Le skill lit ces fichiers **à la demande** quand il doit écrire ou appliquer une mécanique transverse. Pour le flux décisionnel des modes, ce SKILL.md suffit.
 
@@ -39,6 +42,7 @@ Le mode est fixé par la slash command utilisée (cf. ci-dessus). La table ci-de
 | `/maintainability-archive-clear` | **archive-clear** | `[--all\|--keep N\|--older-than <dur>]` — défaut : > 6 mois. Confirme avant d'écrire. |
 | `/maintainability <path>` | **audit forcé** | chemin existant dans le repo — audite la zone fournie. |
 | `/maintainability` (vide) | **audit auto** | (aucun) — inventaire des zones, sélection autonome avec validation user, puis audit. |
+| `/maintainability-crosscut` | **crosscut** | (aucun) — sélection autonome d'une dimension cross-zone (`DUP`/`INC`/`DRF`/`DED`/`BND`) avec validation user, puis sweep. |
 
 Si `$ARGUMENTS` ne respecte pas le format attendu pour la command invoquée (e.g. ID invalide pour double-check, path inexistant pour audit forcé) : le skill **demande une clarification à l'utilisateur** plutôt que de deviner.
 
@@ -86,26 +90,60 @@ Calculer à chaque audit (jamais persisté). Algorithme :
 
 ### C. Sélection (mode auto, args vides)
 
-L'historique sert **deux usages distincts** qui ont des horizons de mémoire différents — la sélection les exploite séparément :
+L'historique sert **trois usages distincts** qui ont des horizons de mémoire différents — la sélection les exploite séparément :
 
-1. **Lire `maintainability_history.md` en entier.** Parser toutes les lignes `- YYYY-MM-DD — <zone> — …` et extraire les zones.
+1. **Lire `maintainability_history.md` en entier.** Parser toutes les lignes `- YYYY-MM-DD — <zone> — …` et extraire les zones (les lignes `crosscut:*` sont ignorées pour la sélection zonale).
 2. Calculer `N = clamp(round(Z / 4), 3, 10)` (override possible via `<!-- rolling_size: M -->` en tête de history).
 3. Construire deux vues sur les zones parsées :
    - **`rolling_actif`** = les `N` zones les plus récentes (les `N` premières lignes du fichier, qui est en ordre prepend = newest-first).
    - **`zones_jamais_auditees`** = `inventaire − {toutes les zones apparaissant dans le fichier, sans limite de date}`.
-4. **Candidats** = `inventaire − rolling_actif`.
-5. **Pondération** :
-   - Zones du candidate set qui sont dans `zones_jamais_auditees` → **priorité haute** (pas encore couvertes dans la vie du projet).
-   - Sinon, sélection aléatoire pondérée parmi les candidats restants (déjà couvertes mais sorties du rolling actif — re-audit légitime).
-6. **Visée pipeline ~30%** : si des candidats `pipeline:` existent et qu'on n'a pas audité de pipeline récemment (rolling), augmenter leur pondération pour atteindre approximativement 30 % des audits sur la durée.
-7. **Annonce en chat** : utiliser le template `selection:proposition` (cf. `references/templates.md`).
-8. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
+4. **Calculer le signal d'activité par zone** (cf. *Signal d'activité* ci-dessous). Pour chaque zone de l'inventaire, classer en :
+   - **`jamais_auditee`** — zone absente de tout history.
+   - **`chaude`** — zone auditée, avec `last_touch_hors_maintainability > last_audit_zone`. Du code utilisateur a bougé depuis le dernier audit.
+   - **`froide`** — zone auditée, sans activité hors-maintainability depuis le dernier audit.
+5. **Candidats** = `inventaire − rolling_actif`.
+6. **Pondération à trois niveaux** :
+   - **Top** : candidats `jamais_auditee` → couverture neuve, priorité absolue.
+   - **Haute** : candidats `chaude` → la zone vient de bouger, le re-audit a un ROI élevé (nouveau code à examiner).
+   - **Basse** : candidats `froide` → re-audit légitime mais marginal (la zone n'a pas changé hors fixes maintainability).
+   
+   Sélection : choisir aléatoirement parmi le niveau le plus haut non vide. Le niveau bas n'est jamais bloqué — il est juste consulté en dernier. Si l'utilisateur veut auditer une zone froide, il passe par `/maintainability <path>`.
+7. **Visée pipeline ~30%** : si des candidats `pipeline:` existent et qu'on n'a pas audité de pipeline récemment (rolling), augmenter leur pondération pour atteindre approximativement 30 % des audits sur la durée. La visée pipeline se cumule avec la pondération d'activité — un pipeline chaud reste prioritaire sur un pipeline froid.
+8. **Annonce en chat** : utiliser le template `selection:proposition` (cf. `references/templates.md`). Le `<motif>` reflète à la fois la couverture (`jamais auditée`, `god file`, `pipeline traçable`) et le signal d'activité (`chaude — <N> commits depuis le dernier audit`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`).
+9. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
 
-**Pourquoi cette séparation** : trimmer history (ancien comportement) faisait perdre la couverture historique. Sur gros projet (40+ zones), après 11+ audits, des zones réellement auditées sortaient du fichier et redevenaient « jamais auditées » du point de vue de la pondération — le skill re-proposait alors des zones déjà couvertes. History est désormais append-only ; le rolling est une vue sur les `N` premières lignes, la couverture est sur le fichier entier.
+**Pourquoi cette séparation** : trimmer history (ancien comportement) faisait perdre la couverture historique. Sur gros projet (40+ zones), après 11+ audits, des zones réellement auditées sortaient du fichier et redevenaient « jamais auditées » du point de vue de la pondération — le skill re-proposait alors des zones déjà couvertes. History est désormais append-only ; le rolling est une vue sur les `N` premières lignes, la couverture est sur le fichier entier, et le signal d'activité prévient le second mode de bouclage (rester collé aux mêmes quelques zones non-rolling sur un gros projet où l'aléatoire pondéré seul ne suffit pas à pousser vers les zones effectivement modifiées).
+
+#### Signal d'activité
+
+Croise les modifications réelles du code (commits utilisateur) avec l'historique des audits, pour pousser la sélection vers les zones où auditer apporte vraiment quelque chose.
+
+**a. Identifier les commits maintainability** (à exclure du calcul d'activité — ils ne reflètent pas un changement utilisateur) :
+- Scanner `maintainability_findings.md` (sections Pending **et** Resolved) : extraire tous les hashes après `Commit : ` ou `Commits : ` (un hash, ou plusieurs séparés par `+`).
+- Scanner `maintainability_resolved_archive.md` s'il existe : pareil.
+- Set `commits_maintainability` = union des hashes extraits (typiquement courts, 7–8 chars).
+
+**b. Calculer `last_touch_hors_maintainability` par zone candidate** :
+- Pour une zone simple (dossier ou fichier) : `git log --format=%H %cI -- <path>` puis filtrer les lignes dont le hash **commence par** un des hashes de `commits_maintainability` (matching par préfixe, car le set contient des hashes courts alors que `%H` est long). `last_touch = max(date)` parmi les restants.
+- Pour un pipeline (`pipeline:<nom>` avec fichiers explicites) : appliquer le calcul sur l'union des fichiers, `last_touch = max` sur tous.
+- Si aucun commit non-maintainability n'existe pour la zone (zone introduite uniquement par des fixes maintainability, cas rare) : `last_touch = epoch`. La zone tombera naturellement en `froide` au point c. — cohérent.
+- **Si le repo n'est pas un git repo** (`.git/` absent au root) : sauter le signal d'activité, retomber sur la pondération à deux niveaux historique (jamais auditée = haute, sinon aléatoire). Annoncer *"Repo non-git : signal d'activité indisponible, pondération en mode dégradé."*
+
+**c. Calculer `last_audit_zone` par zone** :
+- Scanner les lignes history (hors `crosscut:*`) dont la zone matche exactement (chemin exact, ou `pipeline:<nom>` avec même nom).
+- `last_audit_zone = max(date)` parmi ces lignes. Pour une zone dans `zones_jamais_auditees`, ce calcul est inutile (la zone est top de toute façon).
+
+**d. Classement** :
+- `jamais_auditee` ssi zone dans `zones_jamais_auditees`.
+- Sinon `chaude` ssi `last_touch > last_audit_zone`.
+- Sinon `froide`.
+
+**Coût** : un `git log` par zone candidate. Sur Z = 40 zones, ~40 appels — quelques secondes en sélection auto, négligeable face au coût de l'audit lui-même. Sur Z > 80, le coût devient sensible ; à ce stade, le signal reste utile mais le skill peut limiter à un échantillon des top 30 zones par taille LoC (les zones < 200 LoC ont déjà été regroupées en *Inventaire des zones*, donc le filtre par taille est naturel).
 
 #### Cas dégénérés de la sélection
 
 - **Candidats vides** (typiquement petit projet avec un override `rolling_size` qui exclut tout) : relâcher le rolling, choisir la zone la moins récemment auditée parmi **toutes** les zones de l'inventaire. Annoncer *"Toutes les zones sont dans le rolling — j'ai pris la moins récente : `<zone>` (auditée 2026-04-22)."* Si égalité, aléatoire.
+- **Toutes les zones candidates sont froides** : le niveau bas est consulté, choisir aléatoirement parmi les `froide`. Annoncer *"Aucune zone modifiée depuis son dernier audit — re-audit d'une zone froide : `<zone>` (auditée le YYYY-MM-DD, sans activité depuis)."* Pas de blocage — l'audit a toujours un sens, ne serait-ce que pour approfondir.
 - **Inventaire vide** (`Z = 0`) : abort avec *"Aucune zone auditable détectée (chaque dossier fait < 200 LoC source ou est exclu). Le projet est-il vide, ou veux-tu auditer manuellement un chemin précis via `/maintainability <path>` ?"*
 - **Une seule zone candidate après exclusion** : pas d'alternatives à proposer, annoncer la zone unique et demander si on lance.
 
@@ -122,11 +160,12 @@ L'historique sert **deux usages distincts** qui ont des horizons de mémoire dif
 Pour la zone validée :
 
 1. **Lire le code de la zone** intégralement (tous les fichiers source dans le scope).
-2. **Examiner systématiquement toutes les dimensions** du catalogue. Pour chacune :
+2. **Examiner systématiquement toutes les dimensions** du catalogue (cf. `references/dimensions.md`). Pour chacune :
    - Chercher des occurrences concrètes du pattern dans la zone.
-   - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition selon la grille), **estimer le Δ LoC** que produirait l'application de la reco (négatif si la reco supprime du code, positif si elle en ajoute, format `~±N`). Cf. *Estimation Δ LoC*.
+   - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition, cf. `references/quality.md > Grille de sévérité`), **estimer le Δ LoC** que produirait l'application de la reco (cf. `references/quality.md > Estimation Δ LoC`).
+   - **Appliquer le trade-off check** avant de produire (cf. `references/quality.md > Quand ne PAS produire de finding`) — performance, sécurité, scalabilité, lisibilité paradoxale. Si le trade-off est significatif, ne pas produire ; sinon, annoter dans `Reco`.
    - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
-3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres. Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
+3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres (cf. `references/dimensions.md > Seed des dimensions`). Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
 4. **Assignation des IDs** : suivre le mécanisme de `references/file-formats.md > Compteur d'IDs` (lire le header `<!-- id_counters: ... -->`, incrémenter, mettre à jour la ligne header). Format à 3 chiffres (`DUP-007`).
 
 ### F. Écritures (append-only)
@@ -202,6 +241,79 @@ Déclenché par la proposition `double-check:autonomous-batch-proposition` (suit
 - **Archiver les NO-GO** (variante mix, archive partielle) ou **Archiver tous** (variante tous NO-GO) : pour chaque NO-GO, move Pending → Resolved au format compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, ligne history complétée. Cap Resolved respecté.
 - **Rien** / **Garder pending** : terminer sans écriture supplémentaire.
 
+## Mode : crosscut
+
+Déclenché par `/maintainability-crosscut`. Sweep cross-zone sur **une dimension** intrinsèquement transverse — repère les patterns qu'un audit zonal ne voit pas par construction (duplication entre zones, conventions divergentes, types parallèles, dead code global, violations de frontière).
+
+### A. Bootstrap
+
+Même logique que *Mode : audit > A. Bootstrap*. Si `.claude/maintainability_*.md` absent : créer, annoncer *"Bootstrap maintainability sur ce projet, aucun historique préalable."*, puis continuer.
+
+### B. Sélection de la dimension
+
+Une seule dimension par invocation (granularité fine, plus précis qu'un sweep multi-dim). Éligibles : `DUP`, `INC`, `DRF`, `DED` (global), `BND`. Les autres (`CPX`, `SIZ`, `IDM`, `TST`, `CFG`, `DOC`) sont intrinsèquement intra-zone — non éligibles.
+
+Algorithme :
+
+1. **Lire `maintainability_history.md` en entier**. Parser les lignes `- YYYY-MM-DD — crosscut:<DIM> — …` (les lignes zonales sont ignorées pour ce calcul).
+2. `Nx = 5` (override possible via `<!-- crosscut_rolling_size: M -->` en tête de history). Avec 5 dimensions éligibles et `Nx = 5`, le rolling actif est plein après 5 invocations consécutives — le système bascule alors naturellement en round-robin via le cas dégénéré ci-dessous (chaque dimension est re-crosscutée à son tour avant de revenir à la première).
+3. Vues :
+   - `rolling_actif_crosscut` = les `Nx` dimensions les plus récentes parmi les lignes crosscut.
+   - `dimensions_jamais_crosscutées` = `{DUP, INC, DRF, DED, BND} − {toutes dimensions vues dans les lignes crosscut}`.
+4. **Candidats** = `{DUP, INC, DRF, DED, BND} − rolling_actif_crosscut`.
+5. **Pondération** :
+   - Candidats dans `dimensions_jamais_crosscutées` → priorité haute.
+   - Sinon, **signal préliminaire léger** sur les candidats restants (examen rapide, pas un mini-audit) : exports sans call site visible → `DED` ; symboles voisins / signatures similaires dans plusieurs zones → `DUP` ; imports d'internes inter-zones → `BND` ; types parallèles repérés → `DRF` ; styles multiples d'un même concept (3 paginations, 2 formats d'erreur) → `INC`. Signaux mous → aléatoire pondéré.
+6. **Annonce en chat** : template `crosscut:dim-proposition`.
+7. **Validation utilisateur** : accepter, demander une alternative parmi les éligibles, ou imposer (y compris une dimension dans le rolling — l'utilisateur sait ce qu'il veut).
+
+**Cas dégénéré** : si toutes les dimensions sont dans le rolling (situation courante dès que ≥ 5 crosscut ont eu lieu, avec `Nx = 5` par défaut), relâcher : proposer la moins récemment crosscutée, annoncer *"Toutes les dimensions sont dans le rolling — j'ai pris la moins récente : `<DIM>` (crosscut le YYYY-MM-DD)."*. C'est le mode round-robin attendu.
+
+### C. Exécution
+
+Pour la dimension validée, scanner **tout le projet** (mêmes exclusions que l'inventaire de l'audit zonal : `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, généré). L'inventaire des zones (*Mode : audit > B*) sert de carte pour structurer les comparaisons inter-zones — pas de sélection, juste un découpage utile.
+
+Intent par dimension (jugement, pas algorithme prescriptif) :
+
+- **`DUP`** : fonctions / blocs fonctionnellement équivalents dans plusieurs zones. Privilégier les helpers utilitaires (faciles à factoriser) ; ne pas forcer sur la business logic (souvent légitimement séparée).
+- **`INC`** : concepts récurrents (pagination, error handling, logging, config, retries) implémentés différemment dans plusieurs zones.
+- **`DRF`** : types / schemas parallèles divergeant accidentellement (`User` côté API + DB + client, `Order` côté service + worker, etc.).
+- **`DED` global** : exports publics sans call site dans le projet. Borner aux candidats raisonnables (skip les API publiques de plug-in, hooks de framework, exports re-exposés via barrel files).
+- **`BND`** : imports cross-zone qui contournent l'API publique (`_*` Python, `internal/` Go, deep relative imports). Chaque violation = un finding (ou groupe si pattern répété).
+
+**Conventions de finding multi-fichiers** :
+- Title : fichier *primaire* (occurrence majoritaire ou premier alphabétiquement à égalité).
+- `Localisation` : énumère tous les fichiers/lignes impliqués (le champ accepte plusieurs lignes).
+- Préfixe : standard (`DUP`, `INC`, `DRF`, `DED`, `BND`) — **aucun marqueur "crosscut" dans l'entrée**. La nature transverse se lit de la `Localisation` multi-fichiers et de la ligne history correspondante.
+
+**Edge cases existants applicables** : doublons potentiels (référencer l'ID existant en chat sans créer de doublon), trade-off check (cf. `references/quality.md > Quand ne PAS produire de finding`), reclassification (garder l'ID).
+
+### D. Écritures (append-only)
+
+1. **Append des findings** dans `## Pending` de `maintainability_findings.md`. IDs assignés via le mécanisme normal (mêmes compteurs `<!-- id_counters: ... -->` que les audits zonaux — pas de fork).
+2. **Préfixer une nouvelle ligne en tête** de `maintainability_history.md` :
+   ```
+   - YYYY-MM-DD — crosscut:<DIM> — N findings (X HIGH, Y MED, Z LOW) (pending)
+   ```
+3. **Pas de trim** — append-only, comme les audits zonaux.
+
+#### Cas dimension propre (0 findings)
+
+- Ligne history : `- YYYY-MM-DD — crosscut:<DIM> — 0 findings (clean)`.
+- Aucun append dans le findings file.
+- Sortie chat : template `crosscut:clean`.
+
+L'écriture de la ligne history est importante — sans elle, la dimension serait re-proposée trop tôt par le rolling crosscut.
+
+### E. Sortie chat (post-crosscut)
+
+- Findings produits → template `crosscut:summary`.
+- 0 finding → template `crosscut:clean`.
+
+### F. Proposition post-crosscut
+
+Si findings ≥ 1, **réutiliser** *Mode : audit > H. Proposition de double-check autonome* tel quel (templates `audit:proposition` ou `audit:proposition-min` selon le nombre de findings) puis *Mode : audit > I. Action post-proposition batch* pour l'exécution. Logique de sélection des panels, critères, et flux d'exécution **identiques** — pas de duplication. Les templates et la mécanique sont génériques sur la nature de l'audit.
+
 ## Mode : list
 
 Déclenché par `/maintainability-list`. **Pas d'audit, pas de re-vérification, aucune écriture de fichier.** Lecture seule des deux fichiers projet.
@@ -212,8 +324,9 @@ Déclenché par `/maintainability-list`. **Pas d'audit, pas de re-vérification,
 2. Compter les pending par sévérité. Lister les IDs avec un one-liner descriptif (extrait de l'observation, ~50 chars).
 3. **Compter et lister à part les findings stale** (pending dont la bullet `Status` est `stale ...` ou `stale-after-<ID> ...`) — distincts des actifs car ils nécessitent une action utilisateur (relocaliser, marquer résolu, ou archiver) avant de pouvoir être traités. Ils restent inclus dans le total Pending.
 4. Lister les résolus des 30 derniers jours (filtrer par la date dans le titre Resolved).
-5. Lister les entrées du rolling actif (les `N` premières lignes de history).
-6. Détecter les batches groupables parmi les pending **actifs uniquement** (les stale sont exclus du batching, cf. *Batches suggérés*).
+5. Lister les entrées du rolling actif zonal (les `N` premières lignes **non `crosscut:*`** de history, cf. `references/file-formats.md > Lignes crosscut`).
+6. **Rolling crosscut** : lister les `Nx` lignes `crosscut:*` les plus récentes de history (`Nx = 5` par défaut, override `<!-- crosscut_rolling_size: M -->`). Même format de ligne que le rolling zonal : `<date> — crosscut:<DIM> — <N findings (status)>`. Omettre la section si aucune ligne crosscut.
+7. Détecter les batches groupables parmi les pending **actifs uniquement** (les stale sont exclus du batching, cf. *Batches suggérés*).
 
 ### Sortie
 
@@ -227,9 +340,9 @@ Utiliser le template `list:dashboard`. Cas dégénérés :
 
 **Détection** (lecture seule, pas d'analyse de code) :
 
-1. Pour chaque pending, extraire ID, dimension prefix, path, audit_origin (date `Détecté:`), et contenu de la dernière section `Double-check` si présente.
+1. Pour chaque pending, extraire ID, dimension prefix, path (le *primaire* du titre pour les findings multi-fichiers), audit_origin (date `Détecté:`), et contenu de la dernière section `Double-check` si présente.
 2. **Signaux explicites** (haute priorité) dans le Double-check, regex insensibles à la casse : `bundle`/`bundler`, `sequencing`/`étape \d+`, `après <ID>`/`avant <ID>`, `couplé avec <ID>`. Chaque mention d'un autre `<ID>` connu crée une arête ; composantes connexes = batches.
-3. **Signaux heuristiques** (fallback) : même path exact ; sinon même path parent + même dimension prefix ; sinon même audit_origin.
+3. **Signaux heuristiques** (fallback) : même path exact ; sinon même path parent + même dimension prefix ; sinon même audit_origin. Les findings crosscut du même run partagent l'audit_origin (date du crosscut) — ils peuvent batcher entre eux via cette voie sans cas spécial.
 4. Garder seulement les batches de 2 à 5 findings. Lister explicites en premier, compléter avec heuristiques. Max 3 affichés.
 5. Si aucun batch valide : afficher *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt de sélection.
 
@@ -284,6 +397,7 @@ Déclenché par `/maintainability-update`. **Pas d'audit nouveau.** Re-vérifie 
       - Lire les ~20 lignes autour de la localisation.
       - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
       - Si le pattern a disparu → bascule en Resolved.
+      - **Finding multi-fichiers** (bullet `Localisation` listant plusieurs emplacements, typiquement issu d'un crosscut) : lire chacun, juger le pattern globalement. Pattern dissout sur tous les emplacements → Resolved. Pattern partiellement résolu (1 sur N occurrences clear, mais ≥ 2 restent) → status inchangé. Si seul reste 1 emplacement, traiter selon la dimension : `DUP` n'a plus de sens à 1 copie → Resolved ; `DRF`/`INC` peuvent persister à 1 emplacement si le drift / l'incohérence subsiste → status inchangé.
 3. Pour chaque résolu détecté :
    - Déplacer l'entrée de `## Pending` vers `## Resolved` au **format compact** (cf. `references/file-formats.md > Format compact d'une entrée résolue`).
    - Ajouter `(résolu YYYY-MM-DD)` au titre.
@@ -320,7 +434,7 @@ Déclenché par `/maintainability-double-check <ID>` (ex. `/maintainability-doub
 ### Flux
 
 1. **Localiser le finding** : scanner `maintainability_findings.md`, trouver l'entrée `### <ID> — …`. Si absent → demander à l'utilisateur un ID valide (ne pas inventer).
-2. **Lire le fichier référencé** intégralement, plus les fichiers voisins / importeurs.
+2. **Lire le fichier référencé** intégralement, plus les fichiers voisins / importeurs. **Finding multi-fichiers** (bullet `Localisation` énumérant plusieurs emplacements) : lire **tous** les fichiers listés ; le blast radius devient l'union des call sites / tests / surfaces touchées par chaque emplacement.
 3. **Trace** :
    - **Localisation complète** : tous les call sites, imports, références au symbole/pattern concerné.
    - **Blast radius** : tests qui touchent la zone, surfaces publiques affectées, couplages cachés (ce qui casse si on applique le fix proposé).
@@ -378,97 +492,14 @@ Déclenché par `/maintainability-archive-clear [--all|--keep N|--older-than <du
 - Confirmation obligatoire dans tous les cas, même par défaut.
 - Si le filtre ne capture aucune entrée : *"Filtre `<critère>` ne capture aucune entrée. Archive inchangée."* — pas d'écriture, pas même du header.
 
-## Catalogue des dimensions (seed)
+## Doctrine d'évaluation
 
-11 dimensions de départ. **Ce n'est pas une grille fermée** : si un problème de maintenabilité réel ne colle à aucune, **invente un nouveau préfixe 3 lettres** (ex. `LOG-` pour sprawl de logging, `RAC-` pour patterns concurrents). La rigueur est sur l'observation factuelle, pas sur l'étiquetage.
+Trois cadrages normatifs vivent dans `references/` et **doivent être consultés au moment de produire un finding** :
 
-| Préfixe | Dimension | Cible |
-|---|---|---|
-| `DUP` | Duplication / DRY | Code répété, logique copiée-collée avec variations mineures, schémas dupliqués |
-| `CPX` | Complexité inutile, factorisation | Imbrications profondes, accumulation de conditions, opportunités d'extraire un helper |
-| `SIZ` | Taille excessive | God files (≥600 LoC source), modules mêlant trop de responsabilités |
-| `DED` | Code mort | Exports/imports inutilisés, branches inatteignables, blocs commentés laissés en place |
-| `INC` | Patterns incohérents | 3 façons de paginer, 4 conventions d'erreur, 2 styles de logging dans le même module |
-| `IDM` | Idiomes du langage | Non-conformité aux patterns idiomatiques du langage : gestion d'erreur, gestion des ressources, builder pattern, types stricts, etc. (cf. cadrage dédié) |
-| `BND` | Violations de frontière, couplage caché | Module A qui importe les internes de B, contournement de l'API publique, co-changement fréquent |
-| `DRF` | Drift de types/interfaces | Schémas quasi-identiques qui divergent par accident, dup back/front, types parallèles |
-| `TST` | Tests | Redondance, fragilité, ratio code/test qui dérive (tests devenant la majorité du code), tests d'impl plutôt que de contrat |
-| `CFG` | Config / feature-flags sprawl | Env vars / flags accumulés, certains plus jamais flippés ou lus |
-| `DOC` | Doc/commentaires | Désync code/doc, ET commentaires inutiles sur code self-explanatory (paraphrase d'un nom de fonction explicite) |
-
-**Hors scope du skill** : sécurité, performance, accessibilité, choix de stack.
-
-**Principe d'observation** : décrire le problème en clair (fait vérifiable, fichier:ligne, impact concret) **avant** de chercher quel préfixe coller. Ne pas forcer une dimension par audit.
-
-### Cadrage de la dimension IDM
-
-`IDM` cible la non-conformité aux patterns idiomatiques du langage. Le risque de cette dimension est qu'elle dérive en linter de style — le cadrage suivant est strict.
-
-**Détection des langages** : avant l'audit, identifier les langages via extensions et fichiers de config (`Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, `Gemfile`, `pom.xml`, `composer.json`, …). Sur projet multi-langage, évaluer IDM zone par zone selon le langage dominant.
-
-**Périmètre inclus** : patterns structurels avec impact maintenabilité direct — lisibilité par un dev habitué au langage, error-prone-ness évitable, friction avec l'écosystème. Familles à couvrir : gestion d'erreur idiomatique (Rust `Result`/`?`, Go error wrapping, Python `try/except` ciblé), gestion des ressources (context managers Python, `defer` Go, RAII Rust, try-with-resources Java), types et conteneurs adaptés (dataclasses Python, types stricts TS, `Optional` Java), patterns de construction du langage (builder Rust, comprehensions Python). L'agent s'appuie sur sa connaissance des idiomes du langage rencontré, pas sur une liste fermée du skill.
-
-**Périmètre exclu** : tout ce qui est automatisable par un linter ou un formatter — naming style (snake_case vs camelCase), ordre des imports, indentation, choix de quotes, longueur de ligne, espace avant parenthèse. Hors scope du skill.
-
-**Abstention sur méconnaissance** : si l'agent n'a pas une connaissance suffisante des idiomes d'un langage présent dans la zone, il s'abstient sur cette dimension plutôt que d'inventer des règles. Note honnête en chat type *"Je passe IDM sur ce fichier Elixir : idiomes du langage hors zone de confort."*
-
-## Grille de sévérité
-
-Sévérité = **impact × exposition**. Ce n'est pas un goût, c'est une calibration sur l'effet sur la maintenabilité du code.
-
-- **HIGH** — bloque ou alourdit toute évolution future de la zone.
-  Exemples : god file dans un hot path, duplication structurante (3+ copies de logique), drift de contrat utilisé partout, tests fondants empêchant tout refactor.
-- **MED** — friction notable mais contournable.
-  Exemples : incohérence locale de pattern, redondance modérée de tests, sprawl de config sur 2-3 modules, duplication 2× sur fonction utilitaire.
-- **LOW** — cosmétique, nettoyage sans impact comportemental.
-  Exemples : commentaire stale, var inutilisée, doublon trivial dans helper jamais touché, doc d'une fonction self-explanatory.
-
-**La sévérité est mutable.** Un `double-check` peut révéler que ce qu'on pensait HIGH est en fait MED (ou inversement). Dans ce cas : amender l'attribut sévérité dans l'entrée, **ne pas changer l'ID.**
-
-## Quand ne PAS produire de finding
-
-Le skill est intrinsèquement orienté détection, ce qui crée un biais structurel à sur-produire des findings pour "justifier" l'invocation. Sans contre-poids, l'audit dérive vers du **paperclip maximizing** : on optimise la maintenabilité jusqu'à dégrader d'autres aspects du projet. Cette section est le contrepoids.
-
-### Conscience du biais à sur-produire
-
-Une zone qui produit 0 finding sur toutes les dimensions est un audit **réussi**, pas un audit raté. Corollaires opérationnels :
-
-- Ne pas remplir du vide pour rentabiliser l'invocation.
-- Si une dimension n'a rien produit après examen sérieux, passer à la suivante sans forcer.
-- Si la zone entière est propre, l'écrire (ligne history `0 findings (clean)`) et s'arrêter là — pas de finding "consolation" pour avoir l'air d'avoir travaillé.
-- Une dimension qui ne produit jamais rien sur une zone donnée n'est pas un échec d'audit ; le code peut être propre sur cet axe.
-
-### Trade-off check sur les autres axes du projet
-
-Si la reco améliorerait la maintenabilité au prix d'une dégradation visible sur un autre axe : **ne pas produire le finding** par défaut, ou le produire en annotant explicitement le trade-off dans la bullet `Reco`. Axes à vérifier avant production :
-
-- **Performance** : abstraction qui ajoute du coût per-call dans un hot path, allocation supplémentaire, indirection runtime introduite par un helper, copies de données en plus.
-- **Sécurité** : suppression d'un check, élargissement d'une surface d'attaque, partage d'état précédemment isolé, secret précédemment scopé qui devient transitif.
-- **Scalabilité** : suppression d'un seam d'extension, fusion de variantes "presque identiques" qui pourraient diverger demain, aplatissement qui bloque l'ajout futur d'une nouvelle responsabilité, suppression d'une couche d'indirection qui était un point de branchement. Trop simplifier aujourd'hui se paye cher quand on voudra accueillir une feature.
-- **Lisibilité paradoxale** : sur-abstraction qui crée des indirections plus difficiles à suivre que la duplication originale (DRY pathologique : 3 copies divergentes fusionnées en un helper paramétré incompréhensible avec un boolean qui change le comportement à mi-chemin).
-
-**Règle par défaut** : si le trade-off est significatif, ne pas produire le finding. Si le finding est produit malgré un trade-off identifié, l'annoter dans la bullet `Reco` pour que l'utilisateur puisse trancher en connaissance de cause.
-
-Ce check intervient **en amont** de la production du finding. Il ne remplace pas le double-check (qui creuse la faisabilité d'un finding existant) — il intervient une étape avant, à la décision même de produire.
-
-## Estimation Δ LoC
-
-Chaque finding doit indiquer un `Δ LoC` estimé : la variation de lignes de code source que produirait l'application de la reco. Format `~±N` (le `~` marque l'estimation, le signe indique l'effet net).
-
-**Convention de signe :**
-- **Négatif** (`~-40`) : la reco réduit le code (extraction de duplication, suppression de dead code, fusion de variantes).
-- **Positif** (`~+30`) : la reco ajoute du code (split d'un god file en modules avec boilerplate, ajout d'une couche d'abstraction).
-- **Quasi-nul** (`~±5`) : la reco déplace ou réécrit sans réduire (renommage transverse, restructuration locale, harmonisation de pattern).
-
-**Méthode d'estimation à l'audit :**
-- Mesurer la taille des occurrences impliquées (lignes du pattern × nombre de copies).
-- Soustraire la taille du helper / module extrait, en incluant un peu de boilerplate (signature, imports, docstring si nécessaire).
-- Pour les splits de god files : estimer à partir de la taille des responsabilités identifiées + ~10-20 % de boilerplate (imports, signatures, ré-exports).
-- Si l'estimation est trop incertaine pour être utile (e.g. la reco dépend de choix d'architecture non tranchés) : noter `Δ LoC : indéterminé — à affiner en double-check`.
-
-**À l'application du fix (résolution) :** mesurer le delta réel via `git diff --stat` ou comptage direct, et le consigner dans `Resolution :`. Format `Δ LoC mesuré : -47`. C'est cette valeur qui compte dans les bilans, pas l'estimation initiale.
-
-**À un double-check :** raffiner l'estimation à la lumière du blast radius et des contraintes découvertes. Format `Δ LoC affiné : ~-35`. Si le raffinement contredit l'estimation initiale (> 50 % d'écart), expliquer brièvement pourquoi.
+- `references/dimensions.md` — catalogue des 11 dimensions seed et cadrage strict de `IDM`. Indique aussi le hors-scope du skill (sécurité, performance, accessibilité, choix de stack). Préfixes inédits autorisés (3 lettres) si un problème réel ne colle à aucune dimension.
+- `references/quality.md > Grille de sévérité` — HIGH/MED/LOW = impact × exposition. La sévérité est mutable (un double-check peut la reclasser, sans changer l'ID).
+- `references/quality.md > Quand ne PAS produire de finding` — contrepoids au biais structurel de sur-production. Une zone à 0 finding est un audit *réussi*. Trade-off check obligatoire en amont (performance, sécurité, scalabilité, lisibilité paradoxale).
+- `references/quality.md > Estimation Δ LoC` — convention `~±N`, méthode d'estimation, raffinement au double-check, mesure réelle à la résolution.
 
 ## Sorties chat — conventions
 
@@ -513,6 +544,15 @@ Une case **non applicable** au cas courant (ex. cap Resolved pas dépassé donc 
 - Header `<!-- id_counters: ... -->` incrémenté pour chaque préfixe utilisé.
 - Ligne préfixée en tête de `maintainability_history.md`. **Pas de trim** — history est append-only.
 - Si bootstrap a eu lieu : fichiers `.claude/maintainability_*.md` créés avec le contenu initial.
+
+### Crosscut
+
+- Dimension validée par l'utilisateur (template `crosscut:dim-proposition`) avant l'exécution.
+- Findings appendés dans `## Pending` de `maintainability_findings.md` — un par finding produit (ou aucun si dimension propre). Findings multi-fichiers respectent la convention `<localisation>` du titre = primaire + bullet `Localisation` énumérant tous les fichiers.
+- Header `<!-- id_counters: ... -->` incrémenté pour chaque préfixe utilisé (mêmes compteurs que les audits zonaux, pas de fork).
+- Ligne préfixée en tête de `maintainability_history.md` au format `- YYYY-MM-DD — crosscut:<DIM> — ...`. **Pas de trim** — history est append-only.
+- Si bootstrap a eu lieu : fichiers `.claude/maintainability_*.md` créés avec le contenu initial.
+- Si proposition post-crosscut choisie : invariants des modes correspondants (*Double-check* pour single, *Résolution intra-session* pour fix) applicables.
 
 ### Double-check
 

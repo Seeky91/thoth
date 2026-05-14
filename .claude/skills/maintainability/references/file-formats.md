@@ -21,18 +21,19 @@ Référence chargée par SKILL.md quand le skill doit lire ou écrire un fichier
 ### Règles de format
 
 - Format ligne : `- YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (status)`
-- `<zone>` = chemin dossier (`services/billing/refund/`), chemin fichier (`core/api_handler.py`), ou `pipeline:<nom> [fichiers,…]`. Le bracket fichiers n'apparaît QUE pour les pipelines.
+- `<zone>` = chemin dossier (`services/billing/refund/`), chemin fichier (`core/api_handler.py`), `pipeline:<nom> [fichiers,…]`, ou `crosscut:<DIM>` (cf. *Lignes crosscut* plus bas). Le bracket fichiers n'apparaît QUE pour les pipelines.
 - `(status)` : `(pending)`, `(résolus tous)`, ou `(résolus <ID>+<ID>+...)` quand certains seulement sont résolus.
 - Zone propre (0 findings) : ligne `- YYYY-MM-DD — <zone> — 0 findings (clean)`. **Écrire quand même cette ligne** — c'est ce qui mémorise que la zone a été examinée.
 
-### Deux usages du fichier (à distinguer)
+### Trois usages du fichier (à distinguer)
 
-Le fichier sert à **deux choses** qui n'ont pas le même horizon de mémoire :
+Le fichier sert à **trois choses** qui n'ont pas le même horizon de mémoire :
 
 1. **Rolling actif** — les `N` audits les plus récents, à exclure des candidats au prochain audit pour éviter le ressassement. `N = clamp(round(Z / 4), 3, 10)` où `Z` = nombre de zones de l'inventaire courant. Override possible via `<!-- rolling_size: M -->` en tête de fichier.
 2. **Couverture historique** — l'ensemble des zones **jamais auditées dans la vie du projet**, pour pondérer la sélection ("zones jamais auditées → priorité haute"). Construit en scannant **toutes** les lignes du fichier, pas seulement les `N` dernières.
+3. **Datation par zone** — pour chaque zone, `last_audit_zone = max(date)` parmi les lignes history pointant cette zone. Sert au signal d'activité (SKILL.md > Mode audit > C. *Signal d'activité*) : la sélection compare cette date à celle du dernier commit utilisateur du path pour classer la zone en `chaude` / `froide`.
 
-Le fichier sert les deux usages depuis la même source. Le rolling est une **vue** des `N` premières lignes (les plus récentes, car prepend en tête) ; la couverture est l'**union** des zones de toutes les lignes.
+Le fichier sert les trois usages depuis la même source. Le rolling est une **vue** des `N` premières lignes (les plus récentes) ; la couverture est l'**union** des zones de toutes les lignes ; la datation par zone est un **lookup** dans les lignes correspondantes.
 
 ### Pourquoi append-only
 
@@ -41,6 +42,22 @@ Trimmer le fichier à `N` lignes faisait perdre la couverture historique : sur u
 ### Override `rolling_size`
 
 Si `<!-- rolling_size: N -->` est présent en tête de fichier (avant le `#` header), **respecter cette valeur** au lieu du calcul auto, même si elle tombe hors `[3, 10]`. L'utilisateur sait ce qu'il veut ; le skill ne discute pas la valeur. L'override ne porte que sur la **taille du rolling actif** — il n'affecte ni la taille du fichier (toujours unbounded) ni le calcul de la couverture historique (toujours sur l'ensemble du fichier).
+
+### Lignes crosscut
+
+Le crosscut (`/maintainability-crosscut`, cf. *SKILL.md > Mode : crosscut*) écrit ses propres lignes history avec un discriminateur `crosscut:<DIM>` au lieu d'un path de zone. Format :
+
+```
+- 2026-05-11 — crosscut:DUP — 4 findings (1 HIGH, 3 MED) (pending)
+- 2026-03-08 — crosscut:BND — 0 findings (clean)
+```
+
+Ces lignes sont **filtrées différemment** selon l'usage :
+
+- **Rolling actif zonal** et **couverture historique zonale** (usages 1 et 2 ci-dessus) : ignorent les lignes `crosscut:*`. Le rolling zonal ne consomme pas de slot quand un crosscut est exécuté.
+- **Rolling crosscut** (nouvel usage) : ne lit **que** les lignes `crosscut:*`, extrait `<DIM>`, conserve les `Nx = 5` plus récentes pour exclure ces dimensions du prochain crosscut auto. Override possible via `<!-- crosscut_rolling_size: M -->` en tête de fichier.
+
+`Nx = 5` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`) — le rolling se remplit après 5 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. SKILL.md > Mode crosscut > B) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 5 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
 
 ## `.claude/maintainability_findings.md`
 
@@ -82,6 +99,7 @@ Source de vérité des findings. Deux sections (`## Pending`, `## Resolved`) plu
 
 - En-tête entrée : `### <ID> — <SÉVÉRITÉ> — <localisation>` (avec `(résolu YYYY-MM-DD)` ajouté pour les Resolved).
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
+- **Findings multi-fichiers** (typiquement issus du *Mode : crosscut*, mais possibles aussi en audit zonal si l'observation pointe naturellement vers plusieurs lieux) : `<localisation>` du titre = fichier *primaire* (occurrence majoritaire, ou premier alphabétiquement à égalité) ; la bullet `Localisation` énumère tous les fichiers/lignes impliqués (le champ accepte plusieurs lignes ou une énumération `path1:line, path2:line, …`).
 - **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check). Valeurs de `Status` :
   - `pending` (initial),
   - `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable **et** l'investigation self-heal est inconclusive ; cf. SKILL.md > Mode update > étape 2.b),

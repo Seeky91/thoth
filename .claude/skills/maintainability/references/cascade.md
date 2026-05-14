@@ -12,11 +12,13 @@ Référence chargée par SKILL.md quand un fix déclenche la cascade (résolutio
 
 1. **Capter le diff** : `git show --name-only <hash>` où `<hash>` est le commit de la `Resolution` du finding primaire. Pour des fixes batchés (plusieurs primaires dans le même turn) : union des paths sur tous les commits associés. Si pas de commit identifiable (cas rare où le fix n'est pas committé au moment de la résolution) : sauter la cascade et noter en chat *"Cascade re-check sautée : pas de commit identifié pour `<ID>`."*
 
-2. **Filtrer les candidats** parmi `## Pending`, hors les primaires déjà déplacés. Un finding est candidat ssi son path :
+2. **Filtrer les candidats** parmi `## Pending`, hors les primaires déjà déplacés. Un finding est candidat ssi **au moins un** de ses paths :
    - matche exactement un path du diff, ou
    - est descendant d'un dossier du diff, ou
    - est ancêtre d'un path du diff (cas god file dont le contenu est splitté en sous-fichiers).
    
+   Pour un finding mono-fichier : "ses paths" = le path du titre. Pour un finding multi-fichiers (bullet `Localisation` énumérant plusieurs emplacements, typiquement issu d'un crosscut) : "ses paths" = tous les paths listés dans `Localisation`.
+
    **Si zéro candidat** : sortie silencieuse, aucune écriture, aucun message en chat.
 
 3. **Re-check par candidat** — réutilise la logique par-dimension du *Mode update* (lire ~20 lignes autour de la localisation, vérifier si le pattern décrit est encore reconnaissable). Trois issues possibles :
