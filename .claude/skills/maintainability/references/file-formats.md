@@ -36,7 +36,7 @@ Le fichier sert à **trois choses** qui n'ont pas le même horizon de mémoire :
 
 1. **Rolling actif** — les `N` audits les plus récents, à exclure des candidats au prochain audit pour éviter le ressassement. `N = clamp(round(Z / 4), 3, 10)` où `Z` = nombre de zones de l'inventaire courant. Override possible via `<!-- rolling_size: M -->` en tête de fichier.
 2. **Couverture historique** — l'ensemble des zones **jamais auditées dans la vie du projet**, pour pondérer la sélection ("zones jamais auditées → priorité haute"). Construit en scannant **toutes** les lignes du fichier, pas seulement les `N` dernières.
-3. **Datation par zone** — pour chaque zone, `last_audit_zone = max(date)` parmi les lignes history pointant cette zone. Sert au signal d'activité (SKILL.md > Mode audit > C. *Signal d'activité*) : la sélection compare cette date à celle du dernier commit utilisateur du path pour classer la zone en `chaude` / `froide`.
+3. **Datation par zone** — pour chaque zone, `last_audit_zone = max(date)` parmi les lignes history pointant cette zone. Sert au signal d'activité (`references/mode-audit.md > C. Signal d'activité`) : la sélection compare cette date à celle du dernier commit utilisateur du path pour classer la zone en `chaude` / `froide`.
 
 Le fichier sert les trois usages depuis la même source. Le rolling est une **vue** des `N` premières lignes (les plus récentes) ; la couverture est l'**union** des zones de toutes les lignes ; la datation par zone est un **lookup** dans les lignes correspondantes.
 
@@ -50,7 +50,7 @@ Si `<!-- rolling_size: N -->` est présent en tête de fichier (avant le `#` hea
 
 ### Lignes crosscut
 
-Le crosscut (`/maintainability-crosscut`, cf. *SKILL.md > Mode : crosscut*) écrit ses propres lignes history avec un discriminateur `crosscut:<DIM>` au lieu d'un path de zone. Format :
+Le crosscut (`/maintainability-crosscut`, cf. `references/mode-crosscut.md`) écrit ses propres lignes history avec un discriminateur `crosscut:<DIM>` au lieu d'un path de zone. Format :
 
 ```
 - 2026-05-11 — crosscut:DUP — 4 findings (1 HIGH, 3 MED) (pending)
@@ -62,7 +62,7 @@ Ces lignes sont **filtrées différemment** selon l'usage :
 - **Rolling actif zonal** et **couverture historique zonale** (usages 1 et 2 ci-dessus) : ignorent les lignes `crosscut:*`. Le rolling zonal ne consomme pas de slot quand un crosscut est exécuté.
 - **Rolling crosscut** (nouvel usage) : ne lit **que** les lignes `crosscut:*`, extrait `<DIM>`, conserve les `Nx = 5` plus récentes pour exclure ces dimensions du prochain crosscut auto. Override possible via `<!-- crosscut_rolling_size: M -->` en tête de fichier.
 
-`Nx = 5` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`) — le rolling se remplit après 5 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. SKILL.md > Mode crosscut > B) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 5 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
+`Nx = 5` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`) — le rolling se remplit après 5 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. `references/mode-crosscut.md > B`) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 5 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
 
 ## `.claude/maintainability_findings.md`
 
@@ -104,10 +104,10 @@ Source de vérité des findings. Deux sections (`## Pending`, `## Resolved`) plu
 
 - En-tête entrée : `### <ID> — <SÉVÉRITÉ> — <localisation>` (avec `(résolu YYYY-MM-DD)` ajouté pour les Resolved).
 - `<localisation>` = `path:line` ou `path:start-end` ou juste `path` (pour les god files).
-- **Findings multi-fichiers** (typiquement issus du *Mode : crosscut*, mais possibles aussi en audit zonal si l'observation pointe naturellement vers plusieurs lieux) : `<localisation>` du titre = fichier *primaire* (occurrence majoritaire, ou premier alphabétiquement à égalité) ; la bullet `Localisation` énumère tous les fichiers/lignes impliqués (le champ accepte plusieurs lignes ou une énumération `path1:line, path2:line, …`).
+- **Findings multi-fichiers** (typiquement issus du mode crosscut, `references/mode-crosscut.md`, mais possibles aussi en audit zonal si l'observation pointe naturellement vers plusieurs lieux) : `<localisation>` du titre = fichier *primaire* (occurrence majoritaire, ou premier alphabétiquement à égalité) ; la bullet `Localisation` énumère tous les fichiers/lignes impliqués (le champ accepte plusieurs lignes ou une énumération `path1:line, path2:line, …`).
 - **Pending** — bullets dans cet ordre : Dimension, Observation, Reco, Δ LoC, Détecté, Status, puis sections optionnelles (Double-check). Valeurs de `Status` :
   - `pending` (initial),
-  - `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable **et** l'investigation self-heal est inconclusive ; cf. SKILL.md > Mode update > étape 2.b),
+  - `stale (YYYY-MM-DD) — <raison>` (posé par `update` quand le fichier est introuvable **et** l'investigation self-heal est inconclusive ; cf. `references/mode-update.md > étape 2.b`),
   - `stale-after-<ID> (YYYY-MM-DD) — <raison>` (posé par la cascade quand le fix de `<ID>` invalide la localisation ; peut être résolu ou relocalisé au prochain `update` par self-heal).
 - **Resolved** — format compact à 3 bullets : Dimension, Resolution, Audit origin. Voir *Format compact d'une entrée résolue* ci-dessous.
 - L'ID est immuable. Tout autre attribut peut être amendé.
@@ -127,7 +127,7 @@ Source de vérité des findings. Deux sections (`## Pending`, `## Resolved`) plu
 
 `Resolution` doit contenir : description courte du fix + `Δ LoC mesuré : <valeur>` + `Commit : <hash>` (ou `Commits : <h1>+<h2>`). `Audit origin` reprend la date et la zone de l'audit qui a produit le finding.
 
-**Cas NO-GO archivé** (cf. *SKILL.md > Mode audit > H. Proposition de double-check autonome*) : `Resolution` cite la raison du NO-GO en 1-2 phrases ; `Δ LoC : N/A (NO-GO)` remplace le Δ mesuré.
+**Cas NO-GO archivé** (cf. `references/mode-audit.md > H. Proposition de double-check autonome`) : `Resolution` cite la raison du NO-GO en 1-2 phrases ; `Δ LoC : N/A (NO-GO)` remplace le Δ mesuré.
 
 Les entrées Resolved en format verbose **existantes** restent valides — pas de re-écriture rétroactive.
 
@@ -190,7 +190,7 @@ Format : à 3 chiffres (`DUP-007`), peut grandir au-delà sans souci (`DUP-1042`
 4. **Update** (`/maintainability-update`) → re-vérifie chaque pending :
    - Pattern toujours présent → status inchangé.
    - Pattern absent → bascule en Resolved au format compact ; `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD)` + Δ mesuré + `Commit : <hash>` si identifiable via `git log`.
-   - Fichier disparu / déplacé → **investigation self-heal** (cf. SKILL.md > Mode update > étape 2.b). Trois issues : pattern retrouvé ailleurs → relocalisation 1-touch ; pattern dissout → résolu auto avec commit cité ; signaux insuffisants → `Status: stale` (ou préservation de `stale-after-<ID>` posé par la cascade) puis arbitrage utilisateur.
+   - Fichier disparu / déplacé → **investigation self-heal** (cf. `references/mode-update.md > étape 2.b`). Trois issues : pattern retrouvé ailleurs → relocalisation 1-touch ; pattern dissout → résolu auto avec commit cité ; signaux insuffisants → `Status: stale` (ou préservation de `stale-after-<ID>` posé par la cascade) puis arbitrage utilisateur.
 5. **Archivage automatique** → après chaque move vers `## Resolved` (étapes 3, 4, ou *Cas NO-GO en autonomie* du mode audit) :
    - Compter les entrées de la section `## Resolved` du fichier findings.
    - Si > cap (8) : déplacer la (les) plus ancienne(s) vers `maintainability_resolved_archive.md` jusqu'à ramener le compte au cap. Ancienneté déterminée par la date `(résolu YYYY-MM-DD)` dans le titre — la plus petite date part en premier. Tie-break en cas d'égalité de date : ordre dans le fichier (la plus haute dans la section part en premier).

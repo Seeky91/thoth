@@ -32,12 +32,23 @@ make diff        # voir ce qui diffère entre repo et ~/.claude
 make uninstall   # retirer le skill + ses commands de ~/.claude (avec confirmation)
 ```
 
-Le skill est composé d'un `SKILL.md` (hub de contrôle) et de cinq fichiers de référence chargés à la demande :
+Le skill est composé d'un `SKILL.md` **routeur mince** (dispatch + conventions transverses + doctrine, ~150 lignes) et de fichiers de référence chargés **à la demande** — une invocation ne paie que le contexte de son mode :
+
+Un playbook par mode :
+
+* `references/mode-audit.md` — inventaire des zones, sélection auto, exécution, proposition de double-check autonome.
+* `references/mode-crosscut.md` — sélection de la dimension, sweep whole-project.
+* `references/mode-list.md` — tableau de bord lecture seule, détection des batches.
+* `references/mode-update.md` — re-vérification des pendings, self-heal des stales, détection intra-session.
+* `references/mode-double-check.md` — deep-dive d'un finding (blast radius, verdict).
+* `references/mode-archive-clear.md` — purge de l'archive.
+
+Doctrine et formats partagés :
 
 * `references/file-formats.md` — format des fichiers d'état (`maintainability_history.md`, `maintainability_findings.md`, `maintainability_resolved_archive.md`), compteur d'IDs, cycle de vie.
 * `references/cascade.md` — algorithme de la re-vérification en cascade post-fix.
 * `references/templates.md` — templates normatifs des sorties chat.
-* `references/dimensions.md` — catalogue des 11 dimensions seed (`DUP`, `CPX`, `SIZ`, …) et cadrage strict d'`IDM`.
+* `references/dimensions.md` — catalogue des 11 dimensions seed (`DUP`, `CPX`, `SIZ`, …), outils de détection opportunistes, et cadrage strict d'`IDM`.
 * `references/quality.md` — grille de sévérité, garde-fous anti-bruit (« quand ne PAS produire de finding »), convention `Δ LoC`.
 
 Le `make install` copie l'ensemble dans `~/.claude/skills/maintainability/` et les slash commands dans `~/.claude/commands/` (sync via `rsync`, avec `--delete` côté skill pour garantir que `~/.claude` reflète exactement le repo).

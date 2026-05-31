@@ -21,7 +21,7 @@ Référence chargée par SKILL.md quand un fix déclenche la cascade (résolutio
 
    **Si zéro candidat** : sortie silencieuse, aucune écriture, aucun message en chat.
 
-3. **Re-check par candidat** — réutilise la logique par-dimension du *Mode update* (lire ~20 lignes autour de la localisation, vérifier si le pattern décrit est encore reconnaissable). Trois issues possibles :
+3. **Re-check par candidat** — réutilise la logique par-dimension du mode update (`references/mode-update.md`) : lire ~20 lignes autour de la localisation, vérifier si le pattern décrit est encore reconnaissable. Trois issues possibles :
    - **Pattern toujours présent** → laisser pending. Si la ligne a shifté significativement, mettre à jour `path:line` dans le titre. Pas d'autre écriture.
    - **Pattern absent** (fichier toujours là, observation ne tient plus) → cascade-resolved. Move vers `## Resolved` au format compact. Bullet `Resolution :` au format : *"résolu collatéralement par fix de `<ID-primaire>` (YYYY-MM-DD). Δ LoC mesuré : intégré dans `<ID-primaire>`. Commit : `<hash-primaire>`."* — pas de fragmentation du Δ, la valeur globale reste dans la `Resolution` du primaire ; le commit est celui du primaire (le cascadé n'a pas son propre commit).
    - **Fichier disparu / renommé** (path absent du repo après le fix) → laisser en pending et **remplacer** la bullet `Status` par `Status : stale-after-<ID-primaire> (YYYY-MM-DD) — localisation invalidée par le fix, à relocaliser ou archiver`. Pas de question synchrone.
@@ -43,7 +43,7 @@ Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La 
 ### Edge cases
 
 - **Cascade qui résout un autre item du batch en cours** (cas `fix B<n>`) : si le re-check post-fix de l'item #1 résout DUP-008 et que DUP-008 est l'item #2 du batch → skip DUP-008 dans la suite avec annonce *"DUP-008 déjà résolu collatéralement par DUP-007, skip."*
-- **`update` rencontre un `stale-after-<ID>` existant** : passe par l'investigation self-heal (cf. SKILL.md > Mode update > étape 2.b) — le commit primaire est connu, signal direct. Trois issues possibles : auto-relocalisation (pattern retrouvé ailleurs), auto-résolution (pattern dissout par le fix primaire), ou préservation du tag `stale-after-<ID>` si l'investigation est inconclusive. Dans ce dernier cas, **ne pas remplacer** par un `stale` générique — l'info de cause reste plus précieuse.
+- **`update` rencontre un `stale-after-<ID>` existant** : passe par l'investigation self-heal (cf. `references/mode-update.md > étape 2.b`) — le commit primaire est connu, signal direct. Trois issues possibles : auto-relocalisation (pattern retrouvé ailleurs), auto-résolution (pattern dissout par le fix primaire), ou préservation du tag `stale-after-<ID>` si l'investigation est inconclusive. Dans ce dernier cas, **ne pas remplacer** par un `stale` générique — l'info de cause reste plus précieuse.
 
 ### Idempotence et borne de coût
 

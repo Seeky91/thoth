@@ -11,7 +11,7 @@ Je propose : <zone> (<motif>, <taille LoC>)
 Alternatives : <zone-alt-1> (<motif>, <taille>) ou <zone-alt-2> (<motif>, <taille>)
 ```
 
-- `<motif>` reflète à la fois la nature de la zone et son état d'activité (cf. SKILL.md > Mode audit > C. *Signal d'activité*) :
+- `<motif>` reflète à la fois la nature de la zone et son état d'activité (cf. `references/mode-audit.md > C. Signal d'activité`) :
   - **Couverture** : `jamais auditée`, `god file`, `pipeline traçable`.
   - **Activité** : `chaude — <N> commits depuis le dernier audit (YYYY-MM-DD)`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`.
   - Les deux peuvent se combiner : `pipeline traçable, chaud — 12 commits depuis 2026-03-08`.
