@@ -24,6 +24,25 @@ Référence chargée par SKILL.md à l'exécution d'un audit ou d'un crosscut, p
 
 **Principe d'observation** : décrire le problème en clair (fait vérifiable, fichier:ligne, impact concret) **avant** de chercher quel préfixe coller. Ne pas forcer une dimension par audit.
 
+## Outils de détection opportunistes
+
+Source unique de la cartographie outil↔dimension, référencée par *SKILL.md > Mode audit > E.1bis* et *Mode crosscut > C*. Pour les dimensions mécanisables, un outil déterministe bat l'agent en **rappel** et en **localisation** ; l'agent garde le **jugement**. Posture invariante :
+
+- **Opportuniste, jamais obligatoire.** Tester la présence (`command -v <outil>`, ou la présence d'un manifeste de langage) ; si absent, repli sur la lecture/jugement — aucune dépendance dure n'est introduite.
+- **Exécuter, ne pas lire.** C'est la **sortie** de l'outil (idéalement JSON) qui entre en contexte, pas le code source — gain de tokens et de précision.
+- **L'outil propose, l'agent dispose.** Un hit outil = un **candidat à examiner**, pas un finding. L'agent applique ensuite la grille de sévérité, le trade-off check (`references/quality.md`) et peut écarter le bruit. Un seuil d'outil franchi (p.ex. complexité cyclomatique = 11) n'est *pas* un finding en soi.
+
+| Dimension | Outils (sortie JSON si dispo) | Notes |
+|---|---|---|
+| `DUP` | `jscpd` (≈223 langages, reporters json/sarif), PMD `CPD` | Donne blocs dupliqués + localisation exacte ; idéal en crosscut repo-wide. |
+| `DED` | `knip` (JS/TS), `vulture` (Python, scores de confiance), `deadcode -json` (Go), `cargo-machete`/`cargo-udeps` (Rust), `staticcheck` U1000 (Go) | Exports/déps inutilisés. Garder la prudence anti-faux-positif du crosscut `DED` (API publiques, hooks de framework, barrels). |
+| `SIZ` / `CPX` | `scc` (LoC + complexité, `--by-file -f json`), `tokei -o json` (LoC), `lizard` (CCN multi-langage), `radon cc -j` (Python) | Sert aussi à l'inventaire de zones (*Mode audit > B.0*). |
+| `CFG` | `ripgrep` ciblé (`rg` sur lectures d'env vars / flags), `dotenv-linter` (drift `.env`) | Repérer les flags accumulés / jamais lus. |
+| `BND` | graphes d'imports : `madge --circular` (JS/TS), `go list -deps`, `import-linter` (Python), `pydeps` | Cycles, fan-in-out, contournements de frontière. |
+| `DRF` | comparaison de schémas/types au jugement (pas d'outil générique fiable) | Reste majoritairement à la lecture. |
+
+Pour `INC`, `IDM`, `TST`, `DOC` : pas d'outil fiable de substitution — détection au jugement (et pour `IDM`, garde-fou anti-linter strict ci-dessous).
+
 ## Cadrage de la dimension IDM
 
 `IDM` cible la non-conformité aux patterns idiomatiques du langage. Le risque de cette dimension est qu'elle dérive en linter de style — le cadrage suivant est strict.

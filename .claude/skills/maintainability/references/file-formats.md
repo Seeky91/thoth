@@ -2,6 +2,10 @@
 
 Référence chargée par SKILL.md quand le skill doit lire ou écrire un fichier d'état. Trois fichiers vivent dans `<projet>/.claude/`. Format strict, à respecter à la lettre.
 
+### Pourquoi markdown (choix délibéré)
+
+L'état est en **markdown**, pas en JSON/binaire, **par choix** : lisible directement, **git-diffable** (chaque audit/résolution est un diff revue-able), et **éditable à la main** par l'utilisateur (le skill assume et anticipe cette édition — cf. *Compteur d'IDs > header absent* et la non-réutilisation d'ID après suppression manuelle). Un format opaque gagnerait un peu de robustesse de parsing mais perdrait ces trois propriétés, mauvais compromis pour un outil dont l'état doit rester inspectable. **Ne pas migrer vers JSON.** La robustesse de parsing est obtenue autrement : schéma de bullets stable (ci-dessous), écritures en delta (*SKILL.md > Conventions transverses*), et self-heal des compteurs.
+
 ## `.claude/maintainability_history.md`
 
 **Journal d'audits append-only.** Une ligne par audit, **nouvelle entrée préfixée en tête de fichier** (ordre du plus récent au plus ancien). Le fichier n'est **jamais trimmé** — il accumule sur la durée de vie du projet.
@@ -23,6 +27,7 @@ Référence chargée par SKILL.md quand le skill doit lire ou écrire un fichier
 - Format ligne : `- YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (status)`
 - `<zone>` = chemin dossier (`services/billing/refund/`), chemin fichier (`core/api_handler.py`), `pipeline:<nom> [fichiers,…]`, ou `crosscut:<DIM>` (cf. *Lignes crosscut* plus bas). Le bracket fichiers n'apparaît QUE pour les pipelines.
 - `(status)` : `(pending)`, `(résolus tous)`, ou `(résolus <ID>+<ID>+...)` quand certains seulement sont résolus.
+- **Retrouver la bonne ligne** pour compléter `(résolus …)` : matcher sur la **paire exacte (date `Détecté` du finding + zone)**, pas sur la zone seule (une même zone peut avoir plusieurs lignes d'audit à des dates différentes ; un finding multi-fichiers issu d'un crosscut a pour origine une ligne `crosscut:<DIM>`). Si plusieurs lignes restent éligibles après ce matching, **le signaler en chat** plutôt que de deviner.
 - Zone propre (0 findings) : ligne `- YYYY-MM-DD — <zone> — 0 findings (clean)`. **Écrire quand même cette ligne** — c'est ce qui mémorise que la zone a été examinée.
 
 ### Trois usages du fichier (à distinguer)
@@ -160,7 +165,7 @@ Le fichier `maintainability_findings.md` porte un header en commentaire HTML qui
 <!-- id_counters: DUP=12, CPX=8, SIZ=5, INC=4, DRF=2, BND=1, TST=2, DOC=4, DED=4, CFG=1 -->
 ```
 
-**Assignation d'un nouvel ID** : lire le compteur pour le préfixe dans le header, incrémenter, écrire le finding avec ce nouvel ID, mettre à jour la ligne header. Coût trivial : le header est déjà chargé, pas besoin de scanner l'archive ni même la totalité du fichier findings.
+**Assignation d'un nouvel ID** : lire le compteur pour le préfixe dans le header, **le recaler sur la donnée réelle avant d'incrémenter** : `compteur_effectif = max(valeur_header, plus grand NNN observé pour ce préfixe dans le fichier findings)`, puis incrémenter, écrire le finding avec ce nouvel ID, mettre à jour la ligne header. Le scan du seul fichier findings suffit à éviter une **collision active** (deux entrées vivantes partageant un ID) si le header a dérivé après une édition manuelle — coût quasi nul, le fichier findings est déjà en contexte. L'archive n'a pas besoin d'être relue à ce moment (les IDs archivés sont couverts par le recompute self-heal d'`update`/`archive-clear`, qui scanne les deux fichiers) : le header reste un **cache** de la donnée, jamais une source de vérité indépendante.
 
 **Préfixe inédit** (premier finding d'une nouvelle dimension comme `LOG-`, `RAC-`, ou autre invention) : ajouter `<PREFIX>=1` au header.
 

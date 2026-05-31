@@ -38,7 +38,7 @@ L'utilisateur valide tout en un mot. Si push-back partiel (*"garde INC-008 en pe
 
 ### Sortie en chat (flux pré-validés)
 
-Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La cascade s'exécute alors **sans nouveau prompt** ; son résultat agrégé est intégré au récap final via le template `cascade:recap` (cf. SKILL.md > Templates de sortie). Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est omise.
+Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La cascade s'exécute alors **sans nouveau prompt** ; son résultat agrégé est intégré au récap final via le template `cascade:recap-batch` (cf. SKILL.md > Sorties chat — conventions, et `references/templates.md`). Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est omise.
 
 ### Edge cases
 

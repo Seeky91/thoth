@@ -27,7 +27,11 @@ sync:
 	@# Skill : --delete pour garantir que ~/.claude reflète exactement le repo
 	@# (le dossier skill est "owned" par ce repo).
 	@rsync -a --delete $(SKILL_SRC)/ $(SKILL_DEST)/
-	@# Commands : pas de --delete, le dossier commands est partagé entre skills.
+	@# Commands : le dossier commands est partagé entre skills, donc pas de --delete
+	@# global. On purge d'abord les SEULS wrappers de ce skill (même glob scopé que
+	@# uninstall) pour qu'un wrapper renommé/retiré ne laisse pas de commande fantôme,
+	@# puis on resync — miroir exact sans toucher les commands des autres skills.
+	@rm -f $(COMMANDS_DEST)/maintainability*.md
 	@rsync -a $(COMMANDS_SRC)/maintainability*.md $(COMMANDS_DEST)/
 	@echo "Sync OK :"
 	@echo "  $(SKILL_DEST)/{SKILL.md, references/*}"

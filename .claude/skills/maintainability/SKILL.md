@@ -1,6 +1,6 @@
 ---
 name: maintainability
-description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, wants to detect cross-zone consistency issues (drift between modules, duplicated helpers across the project, globally dead exports, boundary violations), asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline.
+description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, wants to detect cross-zone consistency issues (drift between modules, duplicated helpers across the project, globally dead exports, boundary violations), asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline, or asks in French for « un audit de maintenabilité », « une revue de santé du code », « du code mort », « des fichiers trop gros », « de la duplication » ou « de la dette technique ».
 ---
 
 # Maintainability skill
@@ -60,6 +60,14 @@ Avant tout dispatch de mode, le skill confirme que `cwd` est la racine d'un proj
 
 Ce check ne s'applique pas si l'utilisateur passe un `<path>` en argument (absolu, ou relatif résolu vs `cwd`) — dans ce cas, le path lui-même est le scope, et le `.claude/` est créé là où se trouve le marqueur de root le plus proche du path.
 
+## Conventions transverses (tout mode qui écrit l'état)
+
+Deux règles s'appliquent à **chaque** écriture des fichiers d'état, quel que soit le mode. Elles ne sont pas répétées dans chaque flux — elles sont supposées partout.
+
+1. **Date courante déterministe.** Toute date `YYYY-MM-DD` écrite dans l'état (ligne history, `Détecté:`, `(résolu …)`, section `Double-check (…)`, `Status: stale (…)`) ou comparée à une date stockée (seuil « > 6 mois » d'`archive-clear`) doit être obtenue via `date +%F`, **jamais supposée de mémoire**. Cohérent avec l'usage déjà fait de `git log`/`git diff` pour les autres datations. Si l'environnement ne permet pas d'exécuter `date` : le signaler en chat plutôt que d'inventer une date.
+
+2. **Écritures en delta, jamais de régénération.** Les modes lisent l'état tôt et écrivent tard. Avant d'écrire `maintainability_findings.md` ou `maintainability_history.md`, **relire le fichier juste avant l'écriture**, puis **insérer / déplacer uniquement le(s) bloc(s) ciblé(s)** (le nouveau finding, la ligne history préfixée, le move Pending → Resolved). Ne **jamais** régénérer le fichier entier de mémoire : cela peut perdre des entrées existantes et écraser une édition manuelle faite entre-temps (le skill assume explicitement l'édition humaine de ces fichiers, cf. `references/file-formats.md`). L'écriture en delta réduit aussi la surface d'erreur sur les gros fichiers.
+
 ## Mode : audit
 
 Déclenché par `/maintainability` (auto) ou `/maintainability <path>` (forcé).
@@ -76,15 +84,17 @@ Déclenché par `/maintainability` (auto) ou `/maintainability <path>` (forcé).
 
 Calculer à chaque audit (jamais persisté). Algorithme :
 
+0. **Outil de comptage opportuniste (optionnel, dégradation gracieuse).** Avant la marche manuelle, tester `command -v scc || command -v tokei`. Si présent, l'**exécuter en JSON par fichier** (`scc --by-file -f json` ou `tokei -o json`) et en dériver l'inventaire : les outils donnent les LoC de **code réelles** (hors commentaires/blank), par fichier et par langage, en excluant nativement le vendored — exactement le découpage et la chasse aux god files recherchés ci-dessous, en un appel, sans lire le code (c'est la sortie qui entre en contexte, pas les fichiers). **Si aucun n'est présent** : repli sur la marche manuelle (étapes 1-5). L'outil n'est jamais une dépendance dure ; il remplace seulement l'estimation manuelle quand il est là.
 1. **Walk de l'arbo** depuis la racine du projet.
 2. **Pour chaque dossier**, mesurer le total LoC source (exclure `.json`, `.toml`, `.lock`, `.md`, dossiers `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, et tout ce qui ressemble à du généré).
 3. **Règles de découpage** :
    - Dossier 200–2000 LoC → zone candidate.
    - Dossier > 2000 LoC → descendre dans ses sous-dossiers, appliquer la règle récursivement.
    - Dossier < 200 LoC → grouper avec son parent (ne pas le proposer seul).
+   - **Échelle relative** : les seuils portent sur les LoC de **code** (hors commentaires/blank — naturel si l'inventaire vient de `scc`/`tokei`). Ce sont des défauts volontairement simples, pas une table par langage. Sur **très gros repo / monorepo**, viser un découpage où chaque zone tient dans un budget de lecture raisonnable plutôt que de s'accrocher aux 600/2000 LoC absolus : sous-découper un gros package par sous-module plutôt que de le marquer mécaniquement « trop gros ».
 4. **Fichiers ≥ 600 LoC source** (peu importe leur dossier) → zone autonome additionnelle. Chasse les god files même quand ils sont noyés dans un dossier raisonnable.
-5. **Mesure LoC source** : compter les lignes non vides hors lignes-commentaires pures. Approximation acceptable, pas besoin d'AST.
-6. **Pipelines candidats** : si en parcourant l'arbo le skill identifie un flux de données traçable (un point d'entrée qui appelle 3-5 fichiers en chaîne), il peut le proposer comme zone `pipeline:<nom>` avec la liste explicite des fichiers. Si le skill n'arrive pas à nommer le pipeline et ses fichiers concrètement, il **n'inclut pas** de pipeline dans les candidats — on n'invente pas de pipeline pour cocher la case.
+5. **Mesure LoC source** (marche manuelle uniquement — sauté si l'étape 0 a fourni le compte) : compter les lignes non vides hors lignes-commentaires pures. Approximation acceptable, pas besoin d'AST.
+6. **Pipelines candidats** : si en parcourant l'arbo le skill identifie un flux de données traçable (un point d'entrée qui appelle 3-5 fichiers en chaîne), il peut le proposer comme zone `pipeline:<nom>` avec la liste explicite des fichiers. Si le skill n'arrive pas à nommer le pipeline et ses fichiers concrètement, il **n'inclut pas** de pipeline dans les candidats — on n'invente pas de pipeline pour cocher la case. *Optionnel* : si un outil de graphe d'imports est déjà présent dans le repo (`madge --json` JS/TS, `go list -deps`, `pydeps`), s'en servir pour confirmer la fermeture réelle des dépendances autour de l'entry point (capte les imports indirects / l'injection que la lecture à l'œil rate) ; sinon, repli sur le repérage manuel via les imports lus en tête de fichier, l'abstention ci-dessus restant la règle.
 
 `Z` = nombre total de zones candidates issu de cet inventaire.
 
@@ -107,7 +117,7 @@ L'historique sert **trois usages distincts** qui ont des horizons de mémoire di
    - **Haute** : candidats `chaude` → la zone vient de bouger, le re-audit a un ROI élevé (nouveau code à examiner).
    - **Basse** : candidats `froide` → re-audit légitime mais marginal (la zone n'a pas changé hors fixes maintainability).
    
-   Sélection : choisir aléatoirement parmi le niveau le plus haut non vide. Le niveau bas n'est jamais bloqué — il est juste consulté en dernier. Si l'utilisateur veut auditer une zone froide, il passe par `/maintainability <path>`.
+   Sélection : prendre le niveau le plus haut non vide, puis **départager de façon déterministe** (reproductible et auditable via l'history) — `last_audit_zone` la plus ancienne d'abord (les `jamais_auditee` n'en ont pas → considérées comme les plus anciennes), puis, à égalité résiduelle, **ordre alphabétique du chemin de zone**. Ce départage étale quand même la couverture (chaque zone finit par devenir la plus ancienne) tout en restant reproductible d'un run à l'autre. Le niveau bas n'est jamais bloqué — il est juste consulté en dernier. Si l'utilisateur veut auditer une zone froide, il passe par `/maintainability <path>`.
 7. **Visée pipeline ~30%** : si des candidats `pipeline:` existent et qu'on n'a pas audité de pipeline récemment (rolling), augmenter leur pondération pour atteindre approximativement 30 % des audits sur la durée. La visée pipeline se cumule avec la pondération d'activité — un pipeline chaud reste prioritaire sur un pipeline froid.
 8. **Annonce en chat** : utiliser le template `selection:proposition` (cf. `references/templates.md`). Le `<motif>` reflète à la fois la couverture (`jamais auditée`, `god file`, `pipeline traçable`) et le signal d'activité (`chaude — <N> commits depuis le dernier audit`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`).
 9. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
@@ -142,8 +152,8 @@ Croise les modifications réelles du code (commits utilisateur) avec l'historiqu
 
 #### Cas dégénérés de la sélection
 
-- **Candidats vides** (typiquement petit projet avec un override `rolling_size` qui exclut tout) : relâcher le rolling, choisir la zone la moins récemment auditée parmi **toutes** les zones de l'inventaire. Annoncer *"Toutes les zones sont dans le rolling — j'ai pris la moins récente : `<zone>` (auditée 2026-04-22)."* Si égalité, aléatoire.
-- **Toutes les zones candidates sont froides** : le niveau bas est consulté, choisir aléatoirement parmi les `froide`. Annoncer *"Aucune zone modifiée depuis son dernier audit — re-audit d'une zone froide : `<zone>` (auditée le YYYY-MM-DD, sans activité depuis)."* Pas de blocage — l'audit a toujours un sens, ne serait-ce que pour approfondir.
+- **Candidats vides** (typiquement petit projet avec un override `rolling_size` qui exclut tout) : relâcher le rolling, choisir la zone la moins récemment auditée parmi **toutes** les zones de l'inventaire. Annoncer *"Toutes les zones sont dans le rolling — j'ai pris la moins récente : `<zone>` (auditée 2026-04-22)."* À égalité, ordre alphabétique du chemin (même départage déterministe que C.6).
+- **Toutes les zones candidates sont froides** : le niveau bas est consulté, choisir la `froide` la moins récemment auditée (à égalité, ordre alphabétique du chemin). Annoncer *"Aucune zone modifiée depuis son dernier audit — re-audit d'une zone froide : `<zone>` (auditée le YYYY-MM-DD, sans activité depuis)."* Pas de blocage — l'audit a toujours un sens, ne serait-ce que pour approfondir.
 - **Inventaire vide** (`Z = 0`) : abort avec *"Aucune zone auditable détectée (chaque dossier fait < 200 LoC source ou est exclu). Le projet est-il vide, ou veux-tu auditer manuellement un chemin précis via `/maintainability <path>` ?"*
 - **Une seule zone candidate après exclusion** : pas d'alternatives à proposer, annoncer la zone unique et demander si on lance.
 
@@ -160,13 +170,14 @@ Croise les modifications réelles du code (commits utilisateur) avec l'historiqu
 Pour la zone validée :
 
 1. **Lire le code de la zone** intégralement (tous les fichiers source dans le scope).
+1bis. **Indices outillés (optionnel, dégradation gracieuse).** Avant l'examen au jugement, si des outils de détection déterministes sont présents dans l'environnement, les exécuter sur la zone pour obtenir des candidats précis et localisés (duplication, exports morts, complexité, god files). Cf. `references/dimensions.md > Outils de détection opportunistes` pour la cartographie outil↔dimension et la posture (l'outil fournit le **rappel et la localisation** ; l'agent garde le **jugement** — produire ou non le finding, sévérité, trade-off check). **Aucune dépendance dure** : outil absent → repli sur la lecture/jugement de l'étape 2. L'outil ne décide jamais à la place de l'agent.
 2. **Examiner systématiquement toutes les dimensions** du catalogue (cf. `references/dimensions.md`). Pour chacune :
    - Chercher des occurrences concrètes du pattern dans la zone.
    - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition, cf. `references/quality.md > Grille de sévérité`), **estimer le Δ LoC** que produirait l'application de la reco (cf. `references/quality.md > Estimation Δ LoC`).
    - **Appliquer le trade-off check** avant de produire (cf. `references/quality.md > Quand ne PAS produire de finding`) — performance, sécurité, scalabilité, lisibilité paradoxale. Si le trade-off est significatif, ne pas produire ; sinon, annoter dans `Reco`.
    - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
 3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres (cf. `references/dimensions.md > Seed des dimensions`). Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
-4. **Assignation des IDs** : suivre le mécanisme de `references/file-formats.md > Compteur d'IDs` (lire le header `<!-- id_counters: ... -->`, incrémenter, mettre à jour la ligne header). Format à 3 chiffres (`DUP-007`).
+4. **Assignation des IDs** : suivre le mécanisme de `references/file-formats.md > Compteur d'IDs` (lire le header `<!-- id_counters: ... -->`, **le recaler sur le plus grand NNN réellement présent dans findings avant d'incrémenter** — garde-fou anti-collision si le header a dérivé, mettre à jour la ligne header). Format à 3 chiffres (`DUP-007`).
 
 ### F. Écritures (append-only)
 
@@ -273,13 +284,17 @@ Algorithme :
 
 Pour la dimension validée, scanner **tout le projet** (mêmes exclusions que l'inventaire de l'audit zonal : `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, généré). L'inventaire des zones (*Mode : audit > B*) sert de carte pour structurer les comparaisons inter-zones — pas de sélection, juste un découpage utile.
 
+**Scalabilité (le crosscut n'a pas le garde-fou des 5000 LoC de l'audit zonal — D.3 — par construction).** Un scan whole-project par lecture intégrale ne passe pas à l'échelle sur un gros repo, surtout `DUP`/`DED` qui comparent toutes les zones entre elles. Donc :
+- **Privilégier l'outil** quand il est présent (cf. `references/dimensions.md > Outils de détection opportunistes` — `jscpd` repo-wide pour `DUP`, `knip`/`deadcode`/`cargo-udeps` pour `DED` global, etc.), puis trier les candidats au jugement. C'est le chemin nominal sur un projet de taille réelle.
+- **Sinon, fallback borné** : échantillonner les zones les plus pertinentes via la carte d'inventaire (mêmes top-N que le garde-fou de coût du *Signal d'activité*) plutôt que de prétendre tout lire, et **annoncer la couverture partielle** en chat (« couverture : N zones sur M scannées — outil X absent »). Ne jamais laisser croire à une exhaustivité non tenue.
+
 Intent par dimension (jugement, pas algorithme prescriptif) :
 
 - **`DUP`** : fonctions / blocs fonctionnellement équivalents dans plusieurs zones. Privilégier les helpers utilitaires (faciles à factoriser) ; ne pas forcer sur la business logic (souvent légitimement séparée).
 - **`INC`** : concepts récurrents (pagination, error handling, logging, config, retries) implémentés différemment dans plusieurs zones.
 - **`DRF`** : types / schemas parallèles divergeant accidentellement (`User` côté API + DB + client, `Order` côté service + worker, etc.).
 - **`DED` global** : exports publics sans call site dans le projet. Borner aux candidats raisonnables (skip les API publiques de plug-in, hooks de framework, exports re-exposés via barrel files).
-- **`BND`** : imports cross-zone qui contournent l'API publique (`_*` Python, `internal/` Go, deep relative imports). Chaque violation = un finding (ou groupe si pattern répété).
+- **`BND`** : imports cross-zone qui contournent l'API publique (`_*` Python, `internal/` Go, deep relative imports). Chaque violation = un finding (ou groupe si pattern répété). *Si un outil de graphe d'imports est présent* (`madge --circular`, `go list`, `import-linter`), il peut aussi révéler des **cycles inter-modules / fan-in-out** que la seule lecture des imports rate ; ces problèmes de couplage structurel restent dans l'esprit `BND`, ou justifient un préfixe inédit (`CYC`) si on veut les suivre à part — sans pour autant ajouter `CYC` aux dimensions crosscut-éligibles (le round-robin `Nx = 5` est calé sur les 5 dimensions existantes).
 
 **Conventions de finding multi-fichiers** :
 - Title : fichier *primaire* (occurrence majoritaire ou premier alphabétiquement à égalité).
@@ -406,8 +421,10 @@ Déclenché par `/maintainability-update`. **Pas d'audit nouveau.** Re-vérifie 
 4. Pour chaque stale **non résolu par l'investigation self-heal** (générique ou `stale-after-<ID>` préservé) : laisser dans Pending. Le `Status` a déjà été ajusté à l'étape 2.b. Demander à l'utilisateur en chat — message adapté à la cause, et mentionnant brièvement pourquoi le self-heal n'a pas conclu :
    - Stale générique : *"`<ID>` référence un fichier introuvable, investigation inconclusive (`<raison-courte>`). Rouvrir avec nouveau path, marquer résolu (le pattern n'existe plus), ou archiver ?"*
    - Stale-after : *"`<ID>` est `stale-after-<ID-primaire>` depuis le fix du <YYYY-MM-DD>. Investigation inconclusive (`<raison-courte>`). Rouvrir avec nouveau path, marquer résolu, ou archiver ?"*
+   - **Escalade des stales anciens** (borne de terminaison à la boucle d'arbitrage) : comparer la date de pose du `Status: stale (...)` / `stale-after-<ID> (...)` à la date courante (`date +%F`). Si elle dépasse **90 jours**, ne plus re-proposer les trois options à égalité : basculer vers un **défaut explicite d'archivage** — *"`<ID>` est stale depuis le <date-de-pose> (> 90 j sans résolution). J'archive (NO-GO : stale non résolu) sauf objection ?"*. L'utilisateur peut toujours rouvrir/relocaliser ; le but est d'éviter qu'un stale jamais tranché pollue le board indéfiniment. Sans escalade, un stale resterait Pending éternellement.
 5. **Vérification de l'invariant cap Resolved** : compter les entrées de `## Resolved` après les moves. Si > 8, appliquer le flux d'archivage automatique (cf. `references/file-formats.md > Cycle de vie d'un finding` étape 5).
 6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->`. Self-heal contre drift.
+7. **Réconciliation history → findings (lecture seule, signalement only).** Les deux fichiers de l'étape 6 sont déjà chargés ; à ce moment, vérifier que chaque ID présent en `## Resolved`/archive apparaît bien dans un `(résolus <ID>+...)` d'une ligne history, et inversement qu'aucune ligne history ne marque résolu un ID encore dans `## Pending`. **Aucune écriture corrective automatique** : en cas d'incohérence (matching date+zone ambigu, `(résolus …)` oublié ou posé sur la mauvaise ligne), le **signaler en chat** (*"history incohérent : `<ID>` est résolu mais aucune ligne history ne le marque — à corriger à la main"*). `(résolus …)` est purement informatif (n'alimente aucune logique de sélection), donc un simple signalement suffit ; la source de vérité reste `findings.md`.
 
 ### Sortie
 
@@ -568,10 +585,11 @@ Une case **non applicable** au cas courant (ex. cap Resolved pas dépassé donc 
 - **Investigation self-heal exécutée** sur chaque pending dont le fichier est introuvable (cf. étape 2.b).
 - **Stales auto-relocalisés** (signal fort de rename / nouvel emplacement) : titre amendé avec le nouveau path, `Status` reset à `pending`, pattern re-vérifié au nouveau path.
 - **Stales auto-résolus** (pattern dissout, fix identifié) : déplacés vers `## Resolved` au format compact, `Resolution` cite le commit responsable si identifiable.
-- Stales non résolus par investigation taggés `Status: stale` ; `stale-after-<ID>` existants préservés (pas écrasés). L'utilisateur arbitre à l'étape 4.
+- Stales non résolus par investigation taggés `Status: stale` ; `stale-after-<ID>` existants préservés (pas écrasés). L'utilisateur arbitre à l'étape 4. **Stales > 90 j escaladés** vers un défaut d'archivage proposé (cf. étape 4) plutôt que re-proposés à l'identique.
 - Lignes history correspondantes complétées (`(résolus <ID>+...)`).
 - Cap Resolved appliqué (archivage automatique si > 8).
 - Header `<!-- id_counters: ... -->` recomputed (self-heal en re-scannant findings + archive).
+- **Réconciliation history → findings** exécutée en lecture seule (étape 7) ; toute incohérence signalée en chat (pas de correction auto).
 
 ### Résolution intra-session
 

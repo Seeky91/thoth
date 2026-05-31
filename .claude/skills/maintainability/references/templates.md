@@ -27,7 +27,7 @@ Audit terminé — <zone>
   <ID> (<SEV>, Δ ~<delta>) — <observation-courte>
   ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
 
-Δ LoC total estimé si tout est appliqué : ~<sum>.
+Δ LoC net estimé si tout est appliqué : ~<sum> (somme algébrique — suppressions et ajouts confondus ; le détail signé par finding est ci-dessus).
 
 Files mis à jour : .claude/maintainability_findings.md (+<N> findings), .claude/maintainability_history.md (+1 ligne).
 Pour creuser un item à la main : /maintainability-double-check <ID-exemple>.
@@ -83,7 +83,7 @@ Crosscut <DIM> terminé
   <ID> (<SEV>, Δ ~<delta>, <K> fichiers) — <observation-courte>
   ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
 
-Δ LoC total estimé si tout est appliqué : ~<sum>.
+Δ LoC net estimé si tout est appliqué : ~<sum> (somme algébrique — suppressions et ajouts confondus ; le détail signé par finding est ci-dessus).
 
 Files mis à jour : .claude/maintainability_findings.md (+<N> findings), .claude/maintainability_history.md (+1 ligne `crosscut:<DIM>`).
 Pour creuser un item à la main : /maintainability-double-check <ID-exemple>.
@@ -295,7 +295,7 @@ Attend "oui" littéral. Tout autre input → annoncer *"Annulé."* et terminer s
 ## `archive-clear:confirm-partial` — Confirmation purge partielle
 
 ```
-<X> entrées seront supprimées, <Y> conservées (la plus récente : <ID> du <date>). Confirmer ? (y/N)
+<X> entrées seront supprimées : <ID-1>, <ID-2>, … — <Y> conservées (la plus récente : <ID> du <date>). Confirmer ? (y/N)
 ```
 
 ## `archive-clear:done` — Récap purge

@@ -13,6 +13,7 @@ Audit de maintenabilité ciblé avec :
 * historique d'audits **append-only** : le rolling à éviter (N dernières zones) est une vue sur le journal, la couverture historique scanne le fichier entier — pas de zone re-proposée par perte de mémoire après quelques audits
 * **sélection auto qui pousse vers les zones effectivement modifiées** : signal d'activité (git log croisé avec les fixes maintainability) qui priorise les zones jamais auditées et les zones « chaudes » (du code utilisateur a bougé depuis le dernier audit) avant les zones froides
 * **sweeps cross-zone** sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`) — rolling crosscut indépendant (`Nx = 5`) pour cycler naturellement sur les 5 dimensions éligibles
+* **outillage déterministe opportuniste** : si des outils sont présents (`scc`/`tokei` pour l'inventaire, `jscpd`, `knip`/`vulture`/`cargo-udeps`, `lizard`/`radon`, `madge`…), le skill s'en sert pour le rappel et la localisation puis garde le jugement — dégradation gracieuse vers la lecture si absent, jamais de dépendance dure
 * re-vérification et approfondissement des problèmes
 * re-vérification en cascade automatique après chaque fix (les findings dont la localisation chevauche le diff sont rechecké, marqués résolus collatéralement, ou taggés `stale-after`)
 * sorties chat normalisées via templates nommés (`audit:summary`, `list:dashboard`, `resolution:confirm`, …) — forme stable d'une invocation à l'autre
