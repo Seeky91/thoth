@@ -19,7 +19,7 @@ Référence de mode chargée par SKILL.md (routeur) quand `/maintainability-upda
       - Lire les ~20 lignes autour de la localisation.
       - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
       - Si le pattern a disparu → bascule en Resolved.
-      - **Finding multi-fichiers** (bullet `Localisation` listant plusieurs emplacements, typiquement issu d'un crosscut) : lire chacun, juger le pattern globalement. Pattern dissout sur tous les emplacements → Resolved. Pattern partiellement résolu (1 sur N occurrences clear, mais ≥ 2 restent) → status inchangé. Si seul reste 1 emplacement, traiter selon la dimension : `DUP` n'a plus de sens à 1 copie → Resolved ; `DRF`/`INC` peuvent persister à 1 emplacement si le drift / l'incohérence subsiste → status inchangé.
+      - **Finding multi-fichiers** (bullet `Localisation` listant plusieurs emplacements, typiquement issu d'un crosscut) : lire chacun, juger le pattern globalement. Pattern dissout sur tous les emplacements → Resolved. Pattern partiellement résolu (1 sur N occurrences clear, mais ≥ 2 restent) → status inchangé. Si seul reste 1 emplacement, traiter selon la dimension : `DUP` n'a plus de sens à 1 copie → Resolved ; `DRF`/`INC` peuvent persister à 1 emplacement si le drift / l'incohérence subsiste → status inchangé ; `ARC` (cycle, couplage) est résolu quand la **relation** structurelle est rompue (cycle cassé, dépendance inversée), pas quand un des fichiers change → juger sur la relation, pas sur les emplacements.
 3. Pour chaque résolu détecté :
    - Déplacer l'entrée de `## Pending` vers `## Resolved` au **format compact** (cf. `references/file-formats.md > Format compact d'une entrée résolue`).
    - Ajouter `(résolu YYYY-MM-DD)` au titre.

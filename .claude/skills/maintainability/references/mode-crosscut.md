@@ -8,23 +8,23 @@ Même logique que `references/mode-audit.md > A. Bootstrap`. Si `.claude/maintai
 
 ## B. Sélection de la dimension
 
-Une seule dimension par invocation (granularité fine, plus précis qu'un sweep multi-dim). Éligibles : `DUP`, `INC`, `DRF`, `DED` (global), `BND`. Les autres (`CPX`, `SIZ`, `IDM`, `TST`, `CFG`, `DOC`) sont intrinsèquement intra-zone — non éligibles.
+Une seule dimension par invocation (granularité fine, plus précis qu'un sweep multi-dim). Éligibles : `DUP`, `INC`, `DRF`, `DED` (global), `BND`, `ARC`. Les autres (`CPX`, `SIZ`, `IDM`, `TST`, `CFG`, `DOC`) sont intrinsèquement intra-zone — non éligibles. (`ARC`, comme `DUP`, existe aussi en zonal — la cohésion se juge en audit, le couplage profond en crosscut, cf. `references/dimensions.md > Cadrage de la dimension ARC`.)
 
 Algorithme :
 
 1. **Lire `maintainability_history.md` en entier**. Parser les lignes `- YYYY-MM-DD — crosscut:<DIM> — …` (les lignes zonales sont ignorées pour ce calcul).
-2. `Nx = 5` (override possible via `<!-- crosscut_rolling_size: M -->` en tête de history). Avec 5 dimensions éligibles et `Nx = 5`, le rolling actif est plein après 5 invocations consécutives — le système bascule alors naturellement en round-robin via le cas dégénéré ci-dessous (chaque dimension est re-crosscutée à son tour avant de revenir à la première).
+2. `Nx = 6` (override possible via `<!-- crosscut_rolling_size: M -->` en tête de history). Avec 6 dimensions éligibles et `Nx = 6`, le rolling actif est plein après 6 invocations consécutives — le système bascule alors naturellement en round-robin via le cas dégénéré ci-dessous (chaque dimension est re-crosscutée à son tour avant de revenir à la première).
 3. Vues :
    - `rolling_actif_crosscut` = les `Nx` dimensions les plus récentes parmi les lignes crosscut.
-   - `dimensions_jamais_crosscutées` = `{DUP, INC, DRF, DED, BND} − {toutes dimensions vues dans les lignes crosscut}`.
-4. **Candidats** = `{DUP, INC, DRF, DED, BND} − rolling_actif_crosscut`.
+   - `dimensions_jamais_crosscutées` = `{DUP, INC, DRF, DED, BND, ARC} − {toutes dimensions vues dans les lignes crosscut}`.
+4. **Candidats** = `{DUP, INC, DRF, DED, BND, ARC} − rolling_actif_crosscut`.
 5. **Pondération** :
    - Candidats dans `dimensions_jamais_crosscutées` → priorité haute.
-   - Sinon, **signal préliminaire léger** sur les candidats restants (examen rapide, pas un mini-audit) : exports sans call site visible → `DED` ; symboles voisins / signatures similaires dans plusieurs zones → `DUP` ; imports d'internes inter-zones → `BND` ; types parallèles repérés → `DRF` ; styles multiples d'un même concept (3 paginations, 2 formats d'erreur) → `INC`. Signaux mous → aléatoire pondéré.
+   - Sinon, **signal préliminaire léger** sur les candidats restants (examen rapide, pas un mini-audit) : exports sans call site visible → `DED` ; symboles voisins / signatures similaires dans plusieurs zones → `DUP` ; imports d'internes inter-zones → `BND` ; types parallèles repérés → `DRF` ; styles multiples d'un même concept (3 paginations, 2 formats d'erreur) → `INC` ; cycles dans le graphe d'imports ou co-changes répétés inter-modules → `ARC`. Signaux mous → aléatoire pondéré.
 6. **Annonce en chat** : template `crosscut:dim-proposition`.
 7. **Validation utilisateur** : accepter, demander une alternative parmi les éligibles, ou imposer (y compris une dimension dans le rolling — l'utilisateur sait ce qu'il veut).
 
-**Cas dégénéré** : si toutes les dimensions sont dans le rolling (situation courante dès que ≥ 5 crosscut ont eu lieu, avec `Nx = 5` par défaut), relâcher : proposer la moins récemment crosscutée, annoncer *"Toutes les dimensions sont dans le rolling — j'ai pris la moins récente : `<DIM>` (crosscut le YYYY-MM-DD)."*. C'est le mode round-robin attendu.
+**Cas dégénéré** : si toutes les dimensions sont dans le rolling (situation courante dès que ≥ 6 crosscut ont eu lieu, avec `Nx = 6` par défaut), relâcher : proposer la moins récemment crosscutée, annoncer *"Toutes les dimensions sont dans le rolling — j'ai pris la moins récente : `<DIM>` (crosscut le YYYY-MM-DD)."*. C'est le mode round-robin attendu.
 
 ## C. Exécution
 
@@ -40,7 +40,8 @@ Intent par dimension (jugement, pas algorithme prescriptif) :
 - **`INC`** : concepts récurrents (pagination, error handling, logging, config, retries) implémentés différemment dans plusieurs zones.
 - **`DRF`** : types / schemas parallèles divergeant accidentellement (`User` côté API + DB + client, `Order` côté service + worker, etc.).
 - **`DED` global** : exports publics sans call site dans le projet. Borner aux candidats raisonnables (skip les API publiques de plug-in, hooks de framework, exports re-exposés via barrel files).
-- **`BND`** : imports cross-zone qui contournent l'API publique (`_*` Python, `internal/` Go, deep relative imports). Chaque violation = un finding (ou groupe si pattern répété). *Si un outil de graphe d'imports est présent* (`madge --circular`, `go list`, `import-linter`), il peut aussi révéler des **cycles inter-modules / fan-in-out** que la seule lecture des imports rate ; ces problèmes de couplage structurel restent dans l'esprit `BND`, ou justifient un préfixe inédit (`CYC`) si on veut les suivre à part — sans pour autant ajouter `CYC` aux dimensions crosscut-éligibles (le round-robin `Nx = 5` est calé sur les 5 dimensions existantes).
+- **`BND`** : imports cross-zone qui contournent l'API publique (`_*` Python, `internal/` Go, deep relative imports). Chaque violation = un finding (ou groupe si pattern répété). Les **cycles inter-modules / fan-in-out** que révèle un outil de graphe d'imports relèvent d'`ARC`, pas de `BND` (cf. `references/dimensions.md > Frontières entre dimensions voisines` : `BND` = frontière déclarée violée, `ARC` = la structure elle-même est le défaut).
+- **`ARC`** : forme du graphe de dépendances et placement des responsabilités à l'échelle du projet — cycles inter-modules, modules à fort fan-in × fort churn, couplage temporel (co-change git à travers les frontières sans lien d'import), shotgun surgery, abstractions fuyantes transverses. Heuristiques, preuve de friction exigée et reco incrémentale : cf. `references/dimensions.md > Cadrage de la dimension ARC`. Privilégier les outils de graphe + `git log` (langage-agnostique) — la lecture intégrale ne voit pas ces patterns, et le co-change ne coûte aucune dépendance externe.
 
 **Conventions de finding multi-fichiers** :
 - Title : fichier *primaire* (occurrence majoritaire ou premier alphabétiquement à égalité).

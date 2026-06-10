@@ -72,7 +72,7 @@ Alternatives : <DIM-alt-1> (<motif>) ou <DIM-alt-2> (<motif>)
 ```
 
 - `<motif>` ∈ {`jamais crosscutée`, `non vue depuis Nj`, `signal fort sur <zones>`, `aléatoire pondéré`, etc.}
-- 2 alternatives par défaut, parmi les éligibles `{DUP, INC, DRF, DED, BND}` hors `<DIM>` proposé. Si moins disponible (rolling restrictif), lister celles disponibles.
+- 2 alternatives par défaut, parmi les éligibles `{DUP, INC, DRF, DED, BND, ARC}` hors `<DIM>` proposé. Si moins disponible (rolling restrictif), lister celles disponibles.
 
 ## `crosscut:summary` — Crosscut avec findings
 

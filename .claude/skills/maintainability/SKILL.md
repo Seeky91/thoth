@@ -1,6 +1,6 @@
 ---
 name: maintainability
-description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, wants to detect cross-zone consistency issues (drift between modules, duplicated helpers across the project, globally dead exports, boundary violations), asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline, or asks in French for « un audit de maintenabilité », « une revue de santé du code », « du code mort », « des fichiers trop gros », « de la duplication » ou « de la dette technique ».
+description: Use when the user invokes `/maintainability`, asks for a maintainability audit on a codebase, wants to identify duplication / DRY violations / dead code / god files / inconsistent patterns / test redundancy / config sprawl / unnecessary comments in a project, wants an architecture or coupling review (cyclic dependencies, misplaced responsibilities, leaky or speculative abstractions, pass-through layers, deeply nested code needing early returns or pattern matching), wants to detect cross-zone consistency issues (drift between modules, duplicated helpers across the project, globally dead exports, boundary violations), asks to list or update or double-check existing maintainability findings, or wants a structured code-health review of a specific module or pipeline, or asks in French for « un audit de maintenabilité », « une revue de santé du code », « une revue d'architecture », « du couplage fort », « du code trop imbriqué », « de la sur-abstraction », « du code mort », « des fichiers trop gros », « de la duplication » ou « de la dette technique ».
 ---
 
 # Maintainability skill
@@ -10,7 +10,7 @@ description: Use when the user invokes `/maintainability`, asks for a maintainab
 Famille de slash commands :
 
 - `/maintainability` — audit (auto si pas d'arg, forcé si `<path>` fourni)
-- `/maintainability-crosscut` — sweep cross-zone sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`), dimension auto-proposée
+- `/maintainability-crosscut` — sweep cross-zone sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`/`ARC`), dimension auto-proposée
 - `/maintainability-list` — tableau de bord, lecture seule
 - `/maintainability-update` — re-vérification de tous les pendings
 - `/maintainability-double-check <ID>` — deep-dive sur un finding existant
@@ -36,7 +36,7 @@ Ce SKILL.md est un **routeur mince** : il fixe le mode, les conventions transver
 - `references/file-formats.md` — format des trois fichiers d'état (`maintainability_history.md`, `maintainability_findings.md`, `maintainability_resolved_archive.md`), compteur d'IDs, cycle de vie d'un finding, cap Resolved.
 - `references/cascade.md` — algorithme détaillé de la re-vérification en cascade post-fix.
 - `references/templates.md` — templates normatifs des sorties chat (un par usage, e.g. `audit:summary`, `list:dashboard`, `resolution:confirm`). **Lire avant chaque sortie chat** d'un mode pour garder la forme stable d'une invocation à l'autre.
-- `references/dimensions.md` — catalogue des 11 dimensions seed (`DUP`, `CPX`, `SIZ`, `DED`, `INC`, `IDM`, `BND`, `DRF`, `TST`, `CFG`, `DOC`), outils de détection opportunistes, et cadrage de la dimension `IDM`. **Lire avant la production d'un finding** quand le préfixe ou le cadrage de la dimension n'est pas immédiatement évident.
+- `references/dimensions.md` — catalogue des 12 dimensions seed (`DUP`, `CPX`, `SIZ`, `DED`, `INC`, `IDM`, `BND`, `DRF`, `TST`, `CFG`, `DOC`, `ARC`), frontières entre dimensions voisines, outils de détection opportunistes, référentiel paradigmatique (évaluation multi-paradigme), et cadrages des dimensions `IDM`, `ARC` et `CPX`. **Lire avant la production d'un finding** quand le préfixe ou le cadrage de la dimension n'est pas immédiatement évident.
 - `references/quality.md` — grille de sévérité (HIGH/MED/LOW), garde-fous anti-bruit (*"Quand ne PAS produire de finding"*), et convention `Δ LoC`. **Lire avant la production d'un finding** : ces calibrations conditionnent la décision même d'écrire ou pas.
 
 ## Dispatch des modes
@@ -51,7 +51,7 @@ Le mode est fixé par la slash command utilisée (cf. ci-dessus). La table ci-de
 | `/maintainability-archive-clear` | **archive-clear** | `references/mode-archive-clear.md` | `[--all\|--keep N\|--older-than <dur>]` — défaut : > 6 mois. Confirme avant d'écrire. |
 | `/maintainability <path>` | **audit forcé** | `references/mode-audit.md` | chemin existant dans le repo — audite la zone fournie. |
 | `/maintainability` (vide) | **audit auto** | `references/mode-audit.md` | (aucun) — inventaire des zones, sélection autonome avec validation user, puis audit. |
-| `/maintainability-crosscut` | **crosscut** | `references/mode-crosscut.md` | (aucun) — sélection autonome d'une dimension cross-zone (`DUP`/`INC`/`DRF`/`DED`/`BND`) avec validation user, puis sweep. |
+| `/maintainability-crosscut` | **crosscut** | `references/mode-crosscut.md` | (aucun) — sélection autonome d'une dimension cross-zone (`DUP`/`INC`/`DRF`/`DED`/`BND`/`ARC`) avec validation user, puis sweep. |
 
 **Procédure de dispatch** : (1) vérifier le root projet (ci-dessous) ; (2) valider que `$ARGUMENTS` respecte le format attendu — sinon **demander une clarification à l'utilisateur** plutôt que de deviner (e.g. ID invalide pour double-check, path inexistant pour audit forcé) ; (3) **lire le playbook du mode** (`references/mode-<X>.md`) et l'exécuter ; les conventions transverses, la doctrine et les invariants transverses ci-dessous s'appliquent à tous les modes.
 
@@ -81,9 +81,9 @@ Deux règles s'appliquent à **chaque** écriture des fichiers d'état, quel que
 
 Trois cadrages normatifs vivent dans `references/` et **doivent être consultés au moment de produire un finding** :
 
-- `references/dimensions.md` — catalogue des 11 dimensions seed et cadrage strict de `IDM`. Indique aussi le hors-scope du skill (sécurité, performance, accessibilité, choix de stack) et les outils de détection opportunistes. Préfixes inédits autorisés (3 lettres) si un problème réel ne colle à aucune dimension.
+- `references/dimensions.md` — catalogue des 12 dimensions seed, référentiel paradigmatique (haute cohésion / faible couplage évalués contre les idiomes du langage ET les conventions du codebase, jamais contre un dogme unique), et cadrages stricts de `IDM`, `ARC` et `CPX`. Indique aussi le hors-scope du skill (sécurité, performance, accessibilité, choix de stack) et les outils de détection opportunistes. Préfixes inédits autorisés (3 lettres) si un problème réel ne colle à aucune dimension.
 - `references/quality.md > Grille de sévérité` — HIGH/MED/LOW = impact × exposition. La sévérité est mutable (un double-check peut la reclasser, sans changer l'ID).
-- `references/quality.md > Quand ne PAS produire de finding` — contrepoids au biais structurel de sur-production. Une zone à 0 finding est un audit *réussi*. Trade-off check obligatoire en amont (performance, sécurité, scalabilité, lisibilité paradoxale).
+- `references/quality.md > Quand ne PAS produire de finding` — contrepoids au biais structurel de sur-production. Une zone à 0 finding est un audit *réussi*. Trade-off check obligatoire en amont (performance, sécurité, scalabilité, lisibilité paradoxale). Garde-fou *Dogme ≠ défaut* pour les dimensions de jugement (`ARC`, `IDM`, `CPX`) : un écart à un paradigme sans symptôme concret de friction n'est pas un finding.
 - `references/quality.md > Estimation Δ LoC` — convention `~±N`, méthode d'estimation, raffinement au double-check, mesure réelle à la résolution.
 
 ## Sorties chat — conventions

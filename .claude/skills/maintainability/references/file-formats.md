@@ -60,9 +60,9 @@ Le crosscut (`/maintainability-crosscut`, cf. `references/mode-crosscut.md`) éc
 Ces lignes sont **filtrées différemment** selon l'usage :
 
 - **Rolling actif zonal** et **couverture historique zonale** (usages 1 et 2 ci-dessus) : ignorent les lignes `crosscut:*`. Le rolling zonal ne consomme pas de slot quand un crosscut est exécuté.
-- **Rolling crosscut** (nouvel usage) : ne lit **que** les lignes `crosscut:*`, extrait `<DIM>`, conserve les `Nx = 5` plus récentes pour exclure ces dimensions du prochain crosscut auto. Override possible via `<!-- crosscut_rolling_size: M -->` en tête de fichier.
+- **Rolling crosscut** (nouvel usage) : ne lit **que** les lignes `crosscut:*`, extrait `<DIM>`, conserve les `Nx = 6` plus récentes pour exclure ces dimensions du prochain crosscut auto. Override possible via `<!-- crosscut_rolling_size: M -->` en tête de fichier.
 
-`Nx = 5` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`) — le rolling se remplit après 5 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. `references/mode-crosscut.md > B`) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 5 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
+`Nx = 6` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`, `ARC`) — le rolling se remplit après 6 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. `references/mode-crosscut.md > B`) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 6 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
 
 ## `.claude/maintainability_findings.md`
 

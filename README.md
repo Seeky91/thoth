@@ -43,12 +43,13 @@ L'installation est un miroir exact par skill (`rsync --delete` sur `~/.claude/sk
 
 ### 🛠 maintainability
 
-Audit de maintenabilité ciblé et incrémental — détecte et suit la dette de maintenabilité dans le temps sans repasser toujours sur les mêmes zones.
+Audit de maintenabilité ciblé et incrémental — détecte et suit la dette de maintenabilité (duplication, code mort, complexité, défauts d'architecture : couplage, cohésion, abstractions) dans le temps sans repasser toujours sur les mêmes zones.
 
 * suivi des findings via des IDs stables, état persistant par projet (`.claude/`)
 * historique d'audits **append-only** : pas de zone re-proposée par perte de mémoire
 * **sélection auto qui pousse vers les zones effectivement modifiées** : signal d'activité (git log croisé avec les fixes) qui priorise les zones jamais auditées et les zones « chaudes »
-* **sweeps cross-zone** sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`) avec rolling crosscut indépendant (`Nx = 5`)
+* **évaluation multi-paradigme** : architecture et idiomes jugés contre le référentiel du langage *et* les conventions du codebase (haute cohésion / faible couplage, design épuré — early returns, pattern matching), jamais contre un dogme unique ni des seuils statistiques aveugles
+* **sweeps cross-zone** sur une dimension transverse (`DUP`/`INC`/`DRF`/`DED`/`BND`/`ARC`) avec rolling crosscut indépendant (`Nx = 6`)
 * **outillage déterministe opportuniste** : utilise `scc`/`tokei`, `jscpd`, `knip`/`vulture`/`cargo-udeps`, `lizard`/`radon`, `madge`… s'ils sont présents, dégradation gracieuse vers la lecture sinon
 * re-vérification en cascade automatique après chaque fix
 * sorties chat normalisées via templates nommés

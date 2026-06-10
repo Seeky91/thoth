@@ -7,11 +7,11 @@ Référence chargée par SKILL.md à l'exécution d'un audit, d'un crosscut ou d
 Sévérité = **impact × exposition**. Ce n'est pas un goût, c'est une calibration sur l'effet sur la maintenabilité du code.
 
 - **HIGH** — bloque ou alourdit toute évolution future de la zone.
-  Exemples : god file dans un hot path, duplication structurante (3+ copies de logique), drift de contrat utilisé partout, tests fondants empêchant tout refactor.
+  Exemples : god file dans un hot path, duplication structurante (3+ copies de logique), drift de contrat utilisé partout, tests fondants empêchant tout refactor, cycle entre modules cœur, shotgun surgery récurrente (chaque feature touche 5+ fichiers).
 - **MED** — friction notable mais contournable.
-  Exemples : incohérence locale de pattern, redondance modérée de tests, sprawl de config sur 2-3 modules, duplication 2× sur fonction utilitaire.
+  Exemples : incohérence locale de pattern, redondance modérée de tests, sprawl de config sur 2-3 modules, duplication 2× sur fonction utilitaire, couche pass-through, feature envy localisé.
 - **LOW** — cosmétique, nettoyage sans impact comportemental.
-  Exemples : commentaire stale, var inutilisée, doublon trivial dans helper jamais touché, doc d'une fonction self-explanatory.
+  Exemples : commentaire stale, var inutilisée, doublon trivial dans helper jamais touché, doc d'une fonction self-explanatory, généricité spéculative sur un helper peu touché.
 
 **La sévérité est mutable.** Un `double-check` peut révéler que ce qu'on pensait HIGH est en fait MED (ou inversement). Dans ce cas : amender l'attribut sévérité dans l'entrée, **ne pas changer l'ID.**
 
@@ -35,11 +35,15 @@ Si la reco améliorerait la maintenabilité au prix d'une dégradation visible s
 - **Performance** : abstraction qui ajoute du coût per-call dans un hot path, allocation supplémentaire, indirection runtime introduite par un helper, copies de données en plus.
 - **Sécurité** : suppression d'un check, élargissement d'une surface d'attaque, partage d'état précédemment isolé, secret précédemment scopé qui devient transitif.
 - **Scalabilité** : suppression d'un seam d'extension, fusion de variantes "presque identiques" qui pourraient diverger demain, aplatissement qui bloque l'ajout futur d'une nouvelle responsabilité, suppression d'une couche d'indirection qui était un point de branchement. Trop simplifier aujourd'hui se paye cher quand on voudra accueillir une feature.
-- **Lisibilité paradoxale** : sur-abstraction qui crée des indirections plus difficiles à suivre que la duplication originale (DRY pathologique : 3 copies divergentes fusionnées en un helper paramétré incompréhensible avec un boolean qui change le comportement à mi-chemin).
+- **Lisibilité paradoxale** : sur-abstraction qui crée des indirections plus difficiles à suivre que la duplication originale (DRY pathologique : 3 copies divergentes fusionnées en un helper paramétré incompréhensible avec un boolean qui change le comportement à mi-chemin), ou chaîne fonctionnelle dense / one-liner clever qui remplace trois lignes limpides par une expression à déplier mentalement.
 
 **Règle par défaut** : si le trade-off est significatif, ne pas produire le finding. Si le finding est produit malgré un trade-off identifié, l'annoter dans la bullet `Reco` pour que l'utilisateur puisse trancher en connaissance de cause.
 
 Ce check intervient **en amont** de la production du finding. Il ne remplace pas le double-check (qui creuse la faisabilité d'un finding existant) — il intervient une étape avant, à la décision même de produire.
+
+### Dogme ≠ défaut
+
+S'applique surtout aux dimensions de jugement (`ARC`, `IDM`, `CPX`). Un écart à un paradigme, un pattern ou une école d'architecture n'est **pas** un finding en soi. Le finding exige un **symptôme concret de friction de maintenabilité**, citable et vérifiable : la modification qui a dû toucher N fichiers, le call site qui contourne l'abstraction, le bug pattern récurrent, la fonction que personne n'ose toucher. « Ce n'est pas conforme à X » (hexagonale, clean architecture, style fonctionnel pur…) n'est jamais une observation — c'est une préférence. En l'absence de symptôme : abstention. Le cadre d'évaluation multi-paradigme vit dans `references/dimensions.md > Référentiel paradigmatique` ; ce garde-fou en est le pendant côté décision de produire.
 
 ## Estimation Δ LoC
 
