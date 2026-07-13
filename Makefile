@@ -10,6 +10,12 @@
 #   make uninstall-claude|uninstall-codex|uninstall-all [SKILL=foo]
 #   make validate
 
+# Les recettes s'exécutent en POSIX sh : make ignore délibérément la variable
+# SHELL de l'environnement, donc le shell interactif (bash, zsh, fish…) n'a
+# aucun effet sur elles. Épinglé ici pour rester déterministe d'une
+# implémentation de make à l'autre. Aucun bashism dans les recettes.
+SHELL := /bin/sh
+
 CLAUDE_DIR         := $(HOME)/.claude
 CODEX_DIR          := $(HOME)/.agents
 SKILLS_SRC         := skills
@@ -18,7 +24,7 @@ CODEX_SKILLS_DEST  := $(CODEX_DIR)/skills
 
 ALL_SKILLS := $(notdir $(wildcard $(SKILLS_SRC)/*))
 SKILLS     := $(if $(SKILL),$(SKILL),$(ALL_SKILLS))
-AGENT      ?= claude
+AGENT      ?= all
 
 .PHONY: help list check-skill sync \
 	install install-all install-claude install-codex \
@@ -27,7 +33,7 @@ AGENT      ?= claude
 	validate
 
 help:
-	@echo "Targets :"
+	@echo "Targets (install/diff/uninstall sans suffixe : les deux agents ; sync : Claude seul) :"
 	@echo "  make list                              État d'installation par agent"
 	@echo "  make install-claude [SKILL=x]          Installe vers ~/.claude"
 	@echo "  make install-codex  [SKILL=x]          Installe vers ~/.agents"
@@ -86,7 +92,7 @@ diff-claude: check-skill
 	@for s in $(SKILLS); do \
 		echo "=== $$s : skill (repo → ~/.claude) ==="; \
 		if [ -d "$(CLAUDE_SKILLS_DEST)/$$s" ]; then \
-			diff -ru "$(SKILLS_SRC)/$$s" "$(CLAUDE_SKILLS_DEST)/$$s" || true; \
+			if diff -ru "$(SKILLS_SRC)/$$s" "$(CLAUDE_SKILLS_DEST)/$$s"; then echo "  identique."; fi; \
 		else \
 			echo "  non installé — lance 'make install-claude SKILL=$$s'."; \
 		fi; \
@@ -96,9 +102,10 @@ diff-codex: check-skill
 	@for s in $(SKILLS); do \
 		echo "=== $$s : skill (repo → ~/.agents, argument-hint strippé à l'install) ==="; \
 		if [ -d "$(CODEX_SKILLS_DEST)/$$s" ]; then \
-			diff -ru -x SKILL.md "$(SKILLS_SRC)/$$s" "$(CODEX_SKILLS_DEST)/$$s" || true; \
+			rc=0; diff -ru -x SKILL.md "$(SKILLS_SRC)/$$s" "$(CODEX_SKILLS_DEST)/$$s" || rc=1; \
 			grep -v '^argument-hint:' "$(SKILLS_SRC)/$$s/SKILL.md" \
-				| diff -u - "$(CODEX_SKILLS_DEST)/$$s/SKILL.md" || true; \
+				| diff -u - "$(CODEX_SKILLS_DEST)/$$s/SKILL.md" || rc=1; \
+			if [ "$$rc" = 0 ]; then echo "  identique (hors argument-hint strippé)."; fi; \
 		else \
 			echo "  non installé — lance 'make install-codex SKILL=$$s'."; \
 		fi; \
