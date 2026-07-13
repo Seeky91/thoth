@@ -26,14 +26,14 @@ ALL_SKILLS := $(notdir $(wildcard $(SKILLS_SRC)/*))
 SKILLS     := $(if $(SKILL),$(SKILL),$(ALL_SKILLS))
 AGENT      ?= all
 
-.PHONY: help list check-skill sync \
+.PHONY: help list check-skill \
 	install install-all install-claude install-codex \
 	diff diff-all diff-claude diff-codex \
 	uninstall uninstall-all uninstall-claude uninstall-codex \
 	validate
 
 help:
-	@echo "Targets (install/diff/uninstall sans suffixe : les deux agents ; sync : Claude seul) :"
+	@echo "Targets (install/diff/uninstall sans suffixe : les deux agents ; -claude/-codex pour cibler) :"
 	@echo "  make list                              État d'installation par agent"
 	@echo "  make install-claude [SKILL=x]          Installe vers ~/.claude"
 	@echo "  make install-codex  [SKILL=x]          Installe vers ~/.agents"
@@ -60,9 +60,6 @@ check-skill:
 install: install-$(AGENT)
 
 install-all: install-claude install-codex
-
-# Compatibilité avec l'ancien Makefile : `make sync` reste Claude-only.
-sync: install-claude
 
 install-claude: check-skill
 	@mkdir -p "$(CLAUDE_SKILLS_DEST)"

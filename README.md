@@ -57,7 +57,7 @@ make install AGENT=codex
 make install AGENT=all
 ```
 
-Sans `AGENT`, les alias nus `make install`, `make diff` et `make uninstall` ciblent **les deux agents** (défaut `AGENT=all`). Pour Claude Code seul : `make sync` (alias historique conservé) ou les targets `-claude` / `AGENT=claude`. Les targets `*-all` restent la forme explicite équivalente.
+Sans `AGENT`, les alias nus `make install`, `make diff` et `make uninstall` ciblent **les deux agents** (défaut `AGENT=all`). Pour Claude Code seul : `make install-claude` ou `make install AGENT=claude`. Les targets `*-all` restent la forme explicite équivalente.
 
 Destinations :
 
