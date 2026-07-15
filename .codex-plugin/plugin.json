@@ -1,7 +1,7 @@
 {
   "name": "thoth",
-  "version": "0.1.0",
-  "description": "Cross-agent workflows for code maintainability audits and aggressive documentation cleanup.",
+  "version": "0.2.0",
+  "description": "Cross-agent workflows for maintainability, measured performance engineering, and documentation cleanup.",
   "author": {
     "name": "Quentin Jean-Amans",
     "url": "https://github.com/Seeky91"
@@ -11,14 +11,17 @@
   "license": "MIT",
   "keywords": [
     "maintainability",
+    "performance",
+    "profiling",
+    "benchmarking",
     "code-quality",
     "documentation"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Thoth",
-    "shortDescription": "Maintainability and documentation cleanup workflows",
-    "longDescription": "Audit maintainability debt, track findings over time, and remove noisy code comments with reusable workflows shared by Claude Code and Codex.",
+    "shortDescription": "Maintainability, performance, and cleanup workflows",
+    "longDescription": "Audit and resolve maintainability debt, measure and optimize performance with reproducible evidence, and remove noisy code comments through workflows shared by Claude Code and Codex.",
     "developerName": "Quentin Jean-Amans",
     "category": "Productivity",
     "capabilities": [
@@ -27,6 +30,7 @@
     ],
     "defaultPrompt": [
       "Audit the most relevant area for maintainability issues.",
+      "Measure the most relevant performance hotspot and track verified findings.",
       "Clean redundant comments from files changed in this session."
     ]
   }

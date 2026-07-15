@@ -1,4 +1,4 @@
 interface:
   display_name: "Maintainability"
-  short_description: "Audit and track maintainability findings"
+  short_description: "Audit and resolve maintainability debt"
   default_prompt: "Use $maintainability to audit the most relevant code area."

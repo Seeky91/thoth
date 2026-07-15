@@ -12,7 +12,11 @@ skills/
 │   ├── SKILL.md
 │   ├── agents/openai.yaml
 │   └── references/
-└── doc-cleanup/
+├── doc-cleanup/
+│   ├── SKILL.md
+│   ├── agents/openai.yaml
+│   └── references/
+└── performance/
     ├── SKILL.md
     ├── agents/openai.yaml
     └── references/
@@ -90,13 +94,19 @@ Les deux agents chargent les mêmes `SKILL.md`, mais leur syntaxe explicite diff
 | Audit ciblé | `/maintainability src/api` | `$maintainability audite src/api` |
 | Tableau de bord | `/maintainability list` | `$maintainability affiche le tableau de bord` |
 | Re-vérification | `/maintainability update` | `$maintainability re-vérifie les pendings` |
+| Audit performance automatique | `/performance` | `$performance audite la cible la plus pertinente` |
+| Performance ciblée par path | `/performance src/api` | `$performance audite src/api` |
+| Performance ciblée par feature | `/performance feature checkout` | `$performance audite la feature checkout` |
+| Board performance | `/performance list` | `$performance affiche le tableau de bord` |
+| Re-mesure performance | `/performance update` | `$performance re-mesure les pendings` |
+| Double-check performance | `/performance double-check PERF-001` | `$performance double-check PERF-001` |
 | Nettoyage ciblé | `/doc-cleanup src/api` | `$doc-cleanup nettoie src/api` |
 | Fichiers touchés | `/doc-cleanup session` | `$doc-cleanup nettoie les fichiers touchés` |
 | Projet complet | `/doc-cleanup project` | `$doc-cleanup nettoie tout le projet` |
 
 L'invocation implicite reste possible quand la demande correspond à la description d'un skill.
 
-> **Standalone vs plugin.** Les slash commands ci-dessus (`/maintainability`, `/doc-cleanup`) sont celles de l'**installation locale** (`make install-claude`, copie dans `~/.claude/skills/<name>/`). Installé comme **plugin Claude Code** (via marketplace), le skill est préfixé du nom du plugin (`name` de `.claude-plugin/plugin.json`, ici `thoth`) : `/thoth:maintainability` et `/thoth:doc-cleanup`. Corps du skill identique de part et d'autre — seul le nom d'invocation change.
+> **Standalone vs plugin.** Les slash commands ci-dessus (`/maintainability`, `/performance`, `/doc-cleanup`) sont celles de l'**installation locale** (`make install-claude`, copie dans `~/.claude/skills/<name>/`). Installé comme **plugin Claude Code** (via marketplace), le skill est préfixé du nom du plugin (`name` de `.claude-plugin/plugin.json`, ici `thoth`) : `/thoth:maintainability`, `/thoth:performance` et `/thoth:doc-cleanup`. Corps du skill identique de part et d'autre — seul le nom d'invocation change.
 
 ## État généré dans les projets audités
 
@@ -107,6 +117,9 @@ Les exécutions partagent un répertoire neutre entre agents :
 ├── maintainability_history.md
 ├── maintainability_findings.md
 ├── maintainability_resolved_archive.md
+├── performance_history.md
+├── performance_findings.md
+├── performance_resolved_archive.md
 └── doccleanup_coverage.md
 ```
 
@@ -114,7 +127,7 @@ Les exécutions partagent un répertoire neutre entre agents :
 
 ### `maintainability`
 
-Audit de maintenabilité ciblé et incrémental : duplication, code mort, complexité, taille, incohérences, couplage, frontières architecturales, tests redondants, configuration dispersée et dette documentaire légère.
+Audit, suivi et résolution contrôlée de la dette de maintenabilité : duplication, code mort, complexité, taille, incohérences, couplage, frontières architecturales, tests redondants, configuration dispersée et dette documentaire légère.
 
 Le skill fournit :
 
@@ -122,7 +135,20 @@ Le skill fournit :
 - un suivi persistant avec IDs stables ;
 - un tableau de bord et une re-vérification des pendings ;
 - des double-checks avec blast radius et verdict ;
+- des fixes confirmés et validés par les tests ;
 - une re-vérification en cascade après résolution.
+
+### `performance`
+
+Audit de performance fondé sur des mesures reproductibles : latence, throughput, CPU, mémoire, I/O, contention et scalabilité sous charge.
+
+Le skill fournit :
+
+- un audit automatique ou ciblé par path/feature ;
+- un contrat de workload, baseline, profiling et comparabilité ;
+- des findings `PERF-NNN` persistants et un tableau de bord ;
+- des double-checks qui reproduisent et approfondissent la preuve ;
+- des fixes validés par tests, benchmark avant/après et garde-fou de maintenabilité.
 
 ### `doc-cleanup`
 

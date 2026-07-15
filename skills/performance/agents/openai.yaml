@@ -1,0 +1,4 @@
+interface:
+  display_name: "Performance"
+  short_description: "Measure and resolve performance bottlenecks"
+  default_prompt: "Use $performance to audit the most relevant performance hotspot in this project."

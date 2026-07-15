@@ -1,7 +1,7 @@
 ---
 name: maintainability
 argument-hint: "[<path> | list | update | double-check <ID> | crosscut | archive-clear]"
-description: "Audit and track code maintainability: duplication, dead code, complexity, oversized files, inconsistent patterns, coupling, cohesion, boundary violations, architecture drift, test redundancy, config sprawl, and stale or unnecessary comments (tracked as findings — use doc-cleanup for a dedicated comment-removal pass). Use for code-health or architecture reviews, French « audit de maintenabilité » or « dette technique », zonal or cross-project sweeps, listing or refreshing findings, deep-checking an ID, and archive cleanup. Excludes security, performance, accessibility, and stack selection."
+description: "Audit, track, deep-check, and resolve code maintainability debt: duplication, dead code, complexity, oversized files, inconsistent patterns, coupling, cohesion, boundary violations, architecture drift, test redundancy, config sprawl, and stale or unnecessary comments (use doc-cleanup for a dedicated comment-removal pass). Use for code-health or architecture reviews, French « audit de maintenabilité » or « dette technique », zonal or cross-project sweeps, persistent findings, controlled fixes with validation, listing or refreshing findings, deep-checking an ID, and archive cleanup. Excludes security, performance, accessibility, and stack selection."
 ---
 
 # Maintainability skill

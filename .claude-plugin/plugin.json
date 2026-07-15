@@ -1,7 +1,7 @@
 {
   "name": "thoth",
-  "version": "0.1.0",
-  "description": "Cross-agent workflows for code maintainability audits and aggressive documentation cleanup.",
+  "version": "0.2.0",
+  "description": "Cross-agent workflows for maintainability, measured performance engineering, and documentation cleanup.",
   "author": {
     "name": "Quentin Jean-Amans",
     "url": "https://github.com/Seeky91"
@@ -11,6 +11,9 @@
   "license": "MIT",
   "keywords": [
     "maintainability",
+    "performance",
+    "profiling",
+    "benchmarking",
     "code-quality",
     "documentation"
   ]
