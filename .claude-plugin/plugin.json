@@ -1,7 +1,7 @@
 {
   "name": "thoth",
-  "version": "0.2.0",
-  "description": "Cross-agent workflows for maintainability, measured performance engineering, and documentation cleanup.",
+  "version": "0.3.0",
+  "description": "Cross-agent workflows for autonomous maintainability and measured performance cycles, plus documentation cleanup.",
   "author": {
     "name": "Quentin Jean-Amans",
     "url": "https://github.com/Seeky91"
@@ -11,6 +11,8 @@
   "license": "MIT",
   "keywords": [
     "maintainability",
+    "automation",
+    "orchestration",
     "performance",
     "profiling",
     "benchmarking",

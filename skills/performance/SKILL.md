@@ -12,6 +12,8 @@ Mesurer, diagnostiquer, suivre et résoudre les problèmes de performance sans t
 
 Inclure la latence, le throughput, CPU, mémoire/allocations, I/O, contention/concurrence et scalabilité sous charge mesurée. Exclure les audits généraux de maintenabilité, sécurité, accessibilité et choix de stack ; vérifier la correction et la maintenabilité comme garde-fous du changement, sans en faire des axes d'audit autonomes.
 
+**Exception d'orchestration :** une invocation explicite du skill `performance-cycle` vaut confirmation bornée en amont pour sélectionner un workload local sûr et non ambigu, double-checker un finding, appliquer le fix d'un verdict GO, persister sa résolution si toutes les preuves avant/après sont satisfaites et archiver un verdict NO-GO sans scénario crédible de réévaluation. Dans ce cadre seulement, les propositions de sélection, de fix, de résolution et d'archivage deviennent des annonces d'avancement ; les limites de charge externe, de comparabilité, de validation et de Git restent inchangées.
+
 ## Références
 
 Ce `SKILL.md` est un **routeur mince**. Lire les références requises par le mode courant, sans charger les autres :

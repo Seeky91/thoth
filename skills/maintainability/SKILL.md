@@ -10,6 +10,8 @@ description: "Audit, track, deep-check, and resolve code maintainability debt: d
 
 Diagnostiquer et suivre la maintenabilité sans modifier le code audité pendant l'audit. **Le skill audite et suit d'abord** (findings persistants à IDs stables) ; il ne modifie le code qu'ensuite, sur résolution explicite après ta confirmation (`update`, `fix B<n>`) — ce n'est pas un refactoring one-shot. Ne pas utiliser pour la sécurité, la performance, l'accessibilité ou le choix de stack.
 
+**Exception d'orchestration :** une invocation explicite du skill `maintainability-cycle` vaut confirmation bornée en amont pour ses choix de zone/dimension, ses batches, les fixes de ses verdicts GO et l'archivage des verdicts NO-GO sans scénario crédible de réévaluation. Dans ce cadre seulement, les propositions et plans des playbooks deviennent des annonces d'avancement plutôt que des gates ; toutes les autres règles, validations et limites Git restent inchangées.
+
 ## Références
 
 Ce SKILL.md est un **routeur mince** : il fixe le mode, les conventions transverses et la doctrine, puis renvoie vers le playbook du mode. Les détails normatifs vivent dans `references/`, chargées **à la demande** (un mode ne paie pas le contexte des autres) :

@@ -1,7 +1,7 @@
 {
   "name": "thoth",
-  "version": "0.2.0",
-  "description": "Cross-agent workflows for maintainability, measured performance engineering, and documentation cleanup.",
+  "version": "0.3.0",
+  "description": "Cross-agent workflows for autonomous maintainability and measured performance cycles, plus documentation cleanup.",
   "author": {
     "name": "Quentin Jean-Amans",
     "url": "https://github.com/Seeky91"
@@ -11,6 +11,8 @@
   "license": "MIT",
   "keywords": [
     "maintainability",
+    "automation",
+    "orchestration",
     "performance",
     "profiling",
     "benchmarking",
@@ -21,7 +23,7 @@
   "interface": {
     "displayName": "Thoth",
     "shortDescription": "Maintainability, performance, and cleanup workflows",
-    "longDescription": "Audit and resolve maintainability debt, measure and optimize performance with reproducible evidence, and remove noisy code comments through workflows shared by Claude Code and Codex.",
+    "longDescription": "Run autonomous maintainability and measured performance cycles, and remove noisy code comments through workflows shared by Claude Code and Codex.",
     "developerName": "Quentin Jean-Amans",
     "category": "Productivity",
     "capabilities": [
@@ -30,7 +32,9 @@
     ],
     "defaultPrompt": [
       "Audit the most relevant area for maintainability issues.",
+      "Create a goal and complete an autonomous maintainability cycle with final scoped documentation cleanup.",
       "Measure the most relevant performance hotspot and track verified findings.",
+      "Create a goal and complete one autonomous measured performance cycle.",
       "Clean redundant comments from files changed in this session."
     ]
   }

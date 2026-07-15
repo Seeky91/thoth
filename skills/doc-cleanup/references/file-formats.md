@@ -22,7 +22,7 @@ L'état est en markdown (lisible, git-diffable, éditable à la main) et **minim
 ```
 
 - Ligne : `- YYYY-MM-DD — <scope> — <mode> — <N> supprimés, <M> renames, <K> docs dé-driftées — <validation>`
-- `<scope>` = chemin (dossier/fichier) pour `project`/`zone` ; `session (<N> files)` ou `session --touched (<N> files)` pour `session`.
+- `<scope>` = chemin (dossier/fichier) pour `project`/`zone` ; `session (<N> files)`, `session --touched (<N> files)` ou `session --files (<N> files)` pour `session`.
 - `<mode>` ∈ `project` | `zone` | `session`.
 - `<validation>` = `tests OK` | `tests KO (<détail>)` | `validation dégradée (<ce qui a tourné>)`.
 - Stats à 0 acceptées (`0 supprimés (déjà propre)`) — c'est une couverture valide, elle mémorise que la zone a été vue.

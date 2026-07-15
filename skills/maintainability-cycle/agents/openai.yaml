@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintainability Cycle"
+  short_description: "Run autonomous maintainability cycles"
+  default_prompt: "Use $maintainability-cycle to create a goal and complete one autonomous maintainability cycle with a final scoped doc cleanup."

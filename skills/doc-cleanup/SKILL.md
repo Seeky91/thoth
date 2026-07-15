@@ -1,6 +1,6 @@
 ---
 name: doc-cleanup
-argument-hint: "[<path> | project | session [--touched]]"
+argument-hint: "[<path> | project | session [--touched | --files <path>...]]"
 description: "Aggressively remove redundant, stale, or AI-generated code comments and docstrings while preserving business rules, non-obvious intent, safety notes, and public API contracts. Use for comment cleanup, over-documentation, self-documenting renames, project-wide cleanup, or files touched in the current session; also for French requests such as « nettoyer les commentaires » or « supprimer la sur-documentation ». This skill edits code. Use maintainability instead for structural audits."
 ---
 
@@ -24,7 +24,7 @@ Ce SKILL.md est un **routeur mince** : il fixe le mode, les conventions transver
 
 - `references/mode-project.md` — campagne globale : bootstrap, inventaire des zones, ledger de couverture, boucle de campagne, reprise.
 - `references/mode-zone.md` — nettoyage d'un path unique (ou sélection auto d'une zone).
-- `references/mode-session.md` — sélection par diff git, switch `--touched`.
+- `references/mode-session.md` — sélection par diff git, switch `--touched`, ou liste explicite `--files` pour un orchestrateur.
 
 **Orchestration et formats (chargées quand on fan-out ou qu'on écrit l'état)** :
 
@@ -41,8 +41,9 @@ Déduire le mode de la requête utilisateur, indépendamment de la syntaxe d'inv
 | Nettoyer une zone avec chemin | **zone forcée** | `references/mode-zone.md` | Chemin existant, fichier ou dossier. |
 | Nettoyer tout le projet | **project** | `references/mode-project.md` | Aucun argument supplémentaire. |
 | Nettoyer les fichiers de la session | **session** | `references/mode-session.md` | Option `--touched` éventuelle. |
+| Nettoyer une liste explicite de fichiers touchés | **session explicite** | `references/mode-session.md` | `--files <path>...` ; incompatible avec `--touched`. |
 
-Accepter comme aliases de compatibilité `/doccleanup`, `/doccleanup-project` et `/doccleanup-session`. Avec Codex, les formulations équivalentes sont par exemple `$doc-cleanup sur src/`, `$doc-cleanup sur tout le projet` et `$doc-cleanup sur les fichiers touchés --touched`. Si le skill est invoqué explicitement sans précision, choisir **zone auto**.
+Accepter comme aliases de compatibilité `/doccleanup`, `/doccleanup-project` et `/doccleanup-session`. Avec Codex, les formulations équivalentes sont par exemple `$doc-cleanup sur src/`, `$doc-cleanup sur tout le projet`, `$doc-cleanup sur les fichiers touchés --touched` et `$doc-cleanup session sur la liste explicite de fichiers suivante`. Si le skill est invoqué explicitement sans précision, choisir **zone auto**.
 
 **Procédure de dispatch** : (1) vérifier le root projet ; (2) résoudre `<STATE_DIR>` ; (3) valider l'entrée restante de la requête — demander une clarification uniquement pour un chemin inexistant ou un flag inconnu ; (4) lire `references/doctrine.md` ; (5) lire et exécuter le playbook du mode. Ne jamais dépendre d'une variable propre à un agent telle que `$ARGUMENTS`.
 

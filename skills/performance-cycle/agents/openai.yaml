@@ -1,0 +1,4 @@
+interface:
+  display_name: "Performance Cycle"
+  short_description: "Run autonomous measured performance cycles"
+  default_prompt: "Use $performance-cycle to create a goal and complete one autonomous measured performance cycle."
