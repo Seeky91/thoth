@@ -1,197 +1,197 @@
-# Mode : audit
+# Mode: audit
 
-Référence chargée par SKILL.md en mode **audit auto** ou **audit forcé** avec un chemin. Les conventions transverses (date déterministe, écritures en delta) et la doctrine d'évaluation vivent dans SKILL.md et s'appliquent ici.
+Reference loaded by SKILL.md in **auto audit** or **forced audit** mode with a path. Cross-cutting conventions (deterministic date, delta writes) and evaluation doctrine live in SKILL.md and apply here.
 
-## A. Bootstrap (si `<STATE_DIR>/maintainability_*.md` absent)
+## A. Bootstrap (if `<STATE_DIR>/maintainability_*.md` is absent)
 
-1. Si `<STATE_DIR>` n'existe pas dans le projet : créer le dossier.
-2. Si `maintainability_history.md` absent : créer avec `# Maintainability audit history\n\n`.
-3. Si `maintainability_findings.md` absent : créer avec `# Maintainability findings\n\n## Pending\n\n## Resolved\n`. Pas de header `<!-- id_counters: ... -->` à ce stade (création paresseuse à la première assignation d'ID). Pas non plus de `maintainability_resolved_archive.md` (création paresseuse au premier débordement du cap Resolved).
-4. Annoncer en chat : *"Bootstrap maintainability sur ce projet, aucun historique préalable."*
-5. Continuer le flux d'audit normalement (pas de rolling à respecter).
+1. If `<STATE_DIR>` does not exist in the project, create the directory.
+2. If `maintainability_history.md` is absent, create it with `# Maintainability audit history\n\n`.
+3. If `maintainability_findings.md` is absent, create it with `# Maintainability findings\n\n## Pending\n\n## Resolved\n`. Do not add an `<!-- id_counters: ... -->` header yet (create lazily on first ID assignment). Also do not create `maintainability_resolved_archive.md` yet (create lazily when the Resolved cap is first exceeded).
+4. Announce in chat: *"Maintainability bootstrap for this project; no prior history."*
+5. Continue the audit flow normally (no rolling window to honor).
 
-## B. Inventaire des zones
+## B. Zone inventory
 
-Calculer à chaque audit (jamais persisté). Algorithme :
+Compute for every audit (never persist). Algorithm:
 
-0. **Outil de comptage opportuniste (optionnel, dégradation gracieuse).** Avant la marche manuelle, tester `command -v scc || command -v tokei`. Si présent, l'**exécuter en JSON par fichier** (`scc --by-file -f json` ou `tokei -o json`) et en dériver l'inventaire : les outils donnent les LoC de **code réelles** (hors commentaires/blank), par fichier et par langage, en excluant nativement le vendored, sans lire le code (c'est la sortie qui entre en contexte, pas les fichiers). **Si aucun n'est présent** : repli sur la marche manuelle (étapes 1-6) — l'outil n'est jamais une dépendance dure. La détection des landmarks architecturaux (étape 5) reste à faire même si le comptage vient d'un outil : elle dépend du rôle des fichiers/symboles, pas seulement de leur taille.
-1. **Walk de l'arbo** depuis la racine du projet.
-2. **Pour chaque dossier**, mesurer le total LoC source (exclure `.json`, `.toml`, `.lock`, `.md`, dossiers `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, et tout ce qui ressemble à du généré).
-3. **Règles de découpage** :
-   - Dossier 200–2000 LoC → zone candidate.
-   - Dossier > 2000 LoC → descendre dans ses sous-dossiers, appliquer la règle récursivement.
-   - Dossier < 200 LoC → grouper avec son parent (ne pas le proposer seul).
-   - **Échelle relative** : les seuils portent sur les LoC de **code** (hors commentaires/blank — naturel si l'inventaire vient de `scc`/`tokei`). Ce sont des défauts volontairement simples, pas une table par langage. Sur **très gros repo / monorepo**, viser un découpage où chaque zone tient dans un budget de lecture raisonnable plutôt que de s'accrocher aux 600/2000 LoC absolus : sous-découper un gros package par sous-module plutôt que de le marquer mécaniquement « trop gros ».
-4. **Fichiers ≥ 600 LoC source** (peu importe leur dossier) → zone autonome additionnelle. Chasse les god files même quand ils sont noyés dans un dossier raisonnable.
-5. **Landmarks architecturaux (taille ignorée)** : ajouter comme zones candidates les fichiers ou plus petits dossiers propriétaires qui portent une composition root ou une façade structurante, même sous 200 LoC. Exemples stack-agnostiques : entrypoint applicatif (`main`, `app`, `server`, CLI/worker), bootstrap/init/start d'un sous-système, builder/factory qui assemble plusieurs dépendances concrètes, router/API composer, façade publique qui stabilise l'API/boundary d'un module, assembly de pipeline. La zone reste un **path réel** (fichier ou dossier), pas un nouveau type d'history. Si plusieurs landmarks appartiennent au même petit composant, les grouper dans le plus petit dossier propriétaire plutôt que créer 10 micro-zones. Borne anti-bruit : ne retenir que les landmarks qui assemblent ≥3 dépendances/sous-systèmes, fixent une politique de lifecycle, ou sont fortement importés/modifiés ; ignorer les helpers `init_*` triviaux et les simples barrels/réexports sans responsabilité propre. **Exception assumée à la règle `<200 LoC` (étape 3)** : un landmark sous le seuil est proposé pour lui-même au lieu d'être fondu dans son parent ; il peut donc coexister avec la size-zone qui le contient (`src/main.rs` comme landmark **et** dans la zone `src/`) — clés d'history distinctes, voulu : la zone-landmark fait un audit ciblé sur le rôle (lentille `E.1quater`), pas un re-scan du dossier entier.
-6. **Mesure LoC source** (marche manuelle uniquement — sauté si l'étape 0 a fourni le compte) : compter les lignes non vides hors lignes-commentaires pures. Approximation acceptable, pas besoin d'AST.
-7. **Pipelines candidats** : si en parcourant l'arbo le skill identifie un flux de données traçable (un point d'entrée qui appelle 3-5 fichiers en chaîne), il peut le proposer comme zone `pipeline:<nom>` avec la liste explicite des fichiers. Si le skill n'arrive pas à nommer le pipeline et ses fichiers concrètement, il **n'inclut pas** de pipeline dans les candidats — on n'invente pas de pipeline pour cocher la case. *Optionnel* : si un outil de graphe d'imports est déjà présent dans le repo (`madge --json` JS/TS, `go list -deps`, `pydeps`), s'en servir pour confirmer la fermeture réelle des dépendances autour de l'entry point (capte les imports indirects / l'injection que la lecture à l'œil rate) ; sinon, repli sur le repérage manuel via les imports lus en tête de fichier, l'abstention ci-dessus restant la règle.
+0. **Opportunistic counting tool (optional, graceful degradation).** Before the manual walk, test `command -v scc || command -v tokei`. If present, **run it as per-file JSON** (`scc --by-file -f json` or `tokei -o json`) and derive the inventory: these tools provide actual **code** LoC (excluding comments/blank lines), per file and language, natively excluding vendored code, without reading code (their output enters context, not the files). **If neither is present**: fall back to the manual walk (steps 1–6)—the tool is never a hard dependency. Architectural-landmark detection (step 5) remains required even when a tool provides counts: it depends on file/symbol roles, not only size.
+1. **Walk the tree** from the project root.
+2. **For each directory**, measure total source LoC (exclude `.json`, `.toml`, `.lock`, `.md`; directories `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`; and anything apparently generated).
+3. **Partitioning rules**:
+   - Directory with 200–2000 LoC → candidate zone.
+   - Directory > 2000 LoC → descend into subdirectories and apply recursively.
+   - Directory < 200 LoC → group with its parent (do not propose alone).
+   - **Relative scale**: thresholds apply to **code** LoC (excluding comments/blank lines—natural when inventory comes from `scc`/`tokei`). These are deliberately simple defaults, not a per-language table. On a **very large repo/monorepo**, partition so each zone fits a reasonable reading budget rather than clinging to absolute 600/2000 LoC thresholds: split a large package by submodule instead of mechanically labeling it “too large.”
+4. **Files ≥ 600 source LoC** (regardless of directory) → additional standalone zone. This catches god files even inside a reasonably sized directory.
+5. **Architectural landmarks (ignore size)**: add files or smallest owning directories that hold a composition root or structural facade as candidate zones, even under 200 LoC. Stack-agnostic examples: application entrypoint (`main`, `app`, `server`, CLI/worker), subsystem bootstrap/init/start, builder/factory assembling several concrete dependencies, router/API composer, public facade stabilizing a module API/boundary, pipeline assembly. The zone remains a **real path** (file or directory), not a new history type. If several landmarks belong to the same small component, group them in the smallest owning directory instead of creating 10 micro-zones. Noise bound: retain only landmarks that assemble ≥3 dependencies/subsystems, establish lifecycle policy, or are heavily imported/modified; ignore trivial `init_*` helpers and simple barrels/re-exports without their own responsibility. **Deliberate exception to the `<200 LoC` rule (step 3)**: propose a below-threshold landmark itself instead of merging it into its parent; it may therefore coexist with its containing size-zone (`src/main.rs` as a landmark **and** within zone `src/`)—distinct history keys, intentionally: the landmark zone performs a role-focused audit (`E.1quater` lens), not a rescan of the entire directory.
+6. **Source LoC measurement** (manual walk only—skip if step 0 provided the count): count nonempty lines excluding pure comment lines. Approximation is acceptable; no AST needed.
+7. **Candidate pipelines**: if the tree walk identifies a traceable data flow (an entrypoint calling 3–5 files in sequence), it may propose a `pipeline:<name>` zone with the explicit file list. If the skill cannot concretely name the pipeline and its files, it **does not include** a pipeline candidate—do not invent one to tick a box. *Optional*: if an import-graph tool already exists in the repo (`madge --json` for JS/TS, `go list -deps`, `pydeps`), use it to confirm actual dependency closure around the entrypoint (capturing indirect imports/injection missed by visual reading); otherwise fall back to manual inspection of imports at file tops, with the abstention rule above still applying.
 
-`Z` = nombre total de zones candidates issu de cet inventaire.
+`Z` = total number of candidate zones from this inventory.
 
-## C. Sélection (mode auto, args vides)
+## C. Selection (auto mode, empty args)
 
-L'historique sert **trois usages distincts** qui ont des horizons de mémoire différents — la sélection les exploite séparément :
+History serves **three distinct purposes** with different memory horizons—the selection uses them separately:
 
-1. **Lire `maintainability_history.md` en entier.** Parser toutes les lignes `- YYYY-MM-DD — <zone> — …` et extraire les zones (les lignes `crosscut:*` sont ignorées pour la sélection zonale).
-2. Calculer `N = clamp(round(Z / 4), 3, 10)` (override possible via `<!-- rolling_size: M -->` en tête de history).
-3. Construire deux vues sur les zones parsées :
-   - **`rolling_actif`** = les `N` zones les plus récentes (les `N` premières lignes du fichier, qui est en ordre prepend = newest-first).
-   - **`zones_jamais_auditees`** = `inventaire − {toutes les zones apparaissant dans le fichier, sans limite de date}`.
-4. **Calculer le signal d'activité par zone** (cf. *Signal d'activité* ci-dessous). Pour chaque zone de l'inventaire, classer en :
-   - **`jamais_auditee`** — zone absente de tout history.
-   - **`chaude`** — zone auditée, avec `last_touch_hors_maintainability > last_audit_zone`. Du code utilisateur a bougé depuis le dernier audit.
-   - **`froide`** — zone auditée, sans activité hors-maintainability depuis le dernier audit.
-5. **Candidats** = `inventaire − rolling_actif`.
-6. **Pondération à trois niveaux** :
-   - **Top** : candidats `jamais_auditee` → couverture neuve, priorité absolue.
-   - **Haute** : candidats `chaude` → la zone vient de bouger, le re-audit a un ROI élevé (nouveau code à examiner).
-   - **Basse** : candidats `froide` → re-audit légitime mais marginal (la zone n'a pas changé hors fixes maintainability).
+1. **Read all of `maintainability_history.md`.** Parse every `- YYYY-MM-DD — <zone> — …` line and extract zones (`crosscut:*` lines are ignored for zone selection).
+2. Compute `N = clamp(round(Z / 4), 3, 10)` (overridable via `<!-- rolling_size: M -->` at the top of history).
+3. Build two views over parsed zones:
+   - **`active_rolling`** = the `N` most recent zones (the file's first `N` lines; prepend order = newest-first).
+   - **`never_audited_zones`** = `inventory − {all zones appearing in the file, with no date limit}`.
+4. **Compute activity signal per zone** (see *Activity signal* below). Classify every inventory zone as:
+   - **`never_audited`**—zone absent from all history.
+   - **`hot`**—audited zone with `last_touch_outside_maintainability > last_audit_zone`. User code changed since the last audit.
+   - **`cold`**—audited zone with no non-maintainability activity since the last audit.
+5. **Candidates** = `inventory − active_rolling`.
+6. **Three-tier weighting**:
+   - **Top**: `never_audited` candidates → new coverage, absolute priority.
+   - **High**: `hot` candidates → the zone recently changed; re-audit has high ROI (new code to examine).
+   - **Low**: `cold` candidates → legitimate but marginal re-audit (the zone did not change outside maintainability fixes).
    
-   Sélection : prendre le niveau le plus haut non vide, puis **départager de façon déterministe** (reproductible et auditable via l'history) — `last_audit_zone` la plus ancienne d'abord (les `jamais_auditee` n'en ont pas → considérées comme les plus anciennes), puis, à égalité résiduelle, **ordre alphabétique du chemin de zone**. Ce départage étale quand même la couverture (chaque zone finit par devenir la plus ancienne) tout en restant reproductible d'un run à l'autre. Le niveau bas n'est jamais bloqué — il est juste consulté en dernier. Si l'utilisateur veut auditer une zone froide, il invoque le mode audit avec un chemin explicite.
-7. **Visée pipeline ~30%** : si des candidats `pipeline:` existent et qu'on n'a pas audité de pipeline récemment (rolling), augmenter leur pondération pour atteindre approximativement 30 % des audits sur la durée. La visée pipeline se cumule avec la pondération d'activité — un pipeline chaud reste prioritaire sur un pipeline froid.
-8. **Landmarks architecturaux** : les candidats issus de `B.5` participent à la pondération normale (jamais audités / chauds / froids). Ne pas leur donner une priorité absolue permanente : leur intérêt vient de leur rôle central, mais le rolling et l'activité continuent de protéger contre le ressassement. Leur motif d'annonce est `landmark architectural` ou plus précis (`composition root locale`, `façade publique structurante`, `bootstrap sous-système`).
-9. **Annonce en chat** : utiliser le template `selection:proposition` (cf. `references/templates.md`). Le `<motif>` reflète à la fois la couverture (`jamais auditée`, `god file`, `pipeline traçable`, `landmark architectural`) et le signal d'activité (`chaude — <N> commits depuis le dernier audit`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`).
-10. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
+   Selection: take the highest nonempty tier, then **break ties deterministically** (reproducible and auditable through history)—oldest `last_audit_zone` first (`never_audited` have none → treat as oldest), then, for remaining ties, **zone-path alphabetical order**. This still spreads coverage (every zone eventually becomes oldest) while remaining reproducible across runs. The low tier is never blocked—it is merely consulted last. To audit a cold zone, the user invokes audit mode with an explicit path.
+7. **Pipeline target ~30%**: if `pipeline:` candidates exist and no pipeline was audited recently (rolling), increase their weighting to reach approximately 30% of audits over time. Pipeline targeting combines with activity weighting—a hot pipeline remains higher priority than a cold one.
+8. **Architectural landmarks**: candidates from `B.5` participate in normal weighting (never audited/hot/cold). Do not give them permanent absolute priority: their value comes from their central role, but rolling and activity still prevent repetition. Their announcement reason is `architectural landmark` or more specific (`local composition root`, `structuring public facade`, `subsystem bootstrap`).
+9. **Chat announcement**: use the `selection:proposition` template (see `references/templates.md`). `<reason>` reflects both coverage (`never audited`, `god file`, `traceable pipeline`, `architectural landmark`) and activity signal (`hot — <N> commits since last audit`, `cold — audited on YYYY-MM-DD, no non-maintainability activity since`).
+10. **User validation**: accept, request a listed alternative, or impose another path. Wait before starting the audit.
 
-**Pourquoi cette séparation** : trimmer history (ancien comportement) faisait perdre la couverture historique et re-proposer des zones déjà couvertes (détail : `references/file-formats.md > Pourquoi append-only`). History est désormais append-only ; le rolling est une vue sur les `N` premières lignes, la couverture est sur le fichier entier, et le signal d'activité prévient le second mode de bouclage : rester collé aux mêmes quelques zones non-rolling sur un gros projet où l'aléatoire pondéré seul ne suffit pas à pousser vers les zones effectivement modifiées.
+**Why separate these**: trimming history (old behavior) lost historical coverage and reproposed already covered zones (details: `references/file-formats.md > Why append-only`). History is now append-only; rolling is a view over the first `N` lines, coverage uses the entire file, and activity signal prevents a second loop mode: sticking to the same few non-rolling zones in a large project where weighted randomness alone does not sufficiently favor actually modified zones.
 
-### Signal d'activité
+### Activity signal
 
-Croise les modifications réelles du code (commits utilisateur) avec l'historique des audits, pour pousser la sélection vers les zones où auditer apporte vraiment quelque chose.
+Cross-reference actual code changes (user commits) with audit history to favor zones where auditing adds real value.
 
-**a. Identifier les commits maintainability** (à exclure du calcul d'activité — ils ne reflètent pas un changement utilisateur) :
-- Scanner `maintainability_findings.md` (sections Pending **et** Resolved) : extraire tous les hashes après `Commit : ` ou `Commits : ` (un hash, ou plusieurs séparés par `+`).
-- Scanner `maintainability_resolved_archive.md` s'il existe : pareil.
-- Set `commits_maintainability` = union des hashes extraits (typiquement courts, 7–8 chars).
+**a. Identify maintainability commits** (exclude from activity computation—they do not reflect a user change):
+- Scan `maintainability_findings.md` (Pending **and** Resolved sections): extract all hashes after `Commit: ` or `Commits: ` (one hash, or several separated by `+`).
+- Scan `maintainability_resolved_archive.md` if it exists: same.
+- Set `commits_maintainability` = union of extracted hashes (typically short, 7–8 chars).
 
-**b. Calculer `last_touch_hors_maintainability` par zone candidate** :
-- Pour une zone simple (dossier ou fichier) : `git log --format=%H %cI -- <path>` puis filtrer les lignes dont le hash **commence par** un des hashes de `commits_maintainability` (matching par préfixe, car le set contient des hashes courts alors que `%H` est long). `last_touch = max(date)` parmi les restants.
-- Pour un pipeline (`pipeline:<nom>` avec fichiers explicites) : appliquer le calcul sur l'union des fichiers, `last_touch = max` sur tous.
-- Si aucun commit non-maintainability n'existe pour la zone (zone introduite uniquement par des fixes maintainability, cas rare) : `last_touch = epoch`. La zone tombera naturellement en `froide` au point c. — cohérent.
-- **Si le repo n'est pas un git repo** (`.git/` absent au root) : sauter le signal d'activité, retomber sur la pondération à deux niveaux historique (jamais auditée = haute, sinon aléatoire). Annoncer *"Repo non-git : signal d'activité indisponible, pondération en mode dégradé."*
+**b. Compute `last_touch_outside_maintainability` per candidate zone**:
+- For a simple zone (directory or file): run `git log --format=%H %cI -- <path>`, then filter lines whose hash **starts with** one of the `commits_maintainability` hashes (prefix matching because the set contains short hashes while `%H` is long). `last_touch = max(date)` among the remainder.
+- For a pipeline (`pipeline:<name>` with explicit files): apply the computation over the union of files, `last_touch = max` across all.
+- If no non-maintainability commit exists for the zone (zone introduced only by maintainability fixes, rare): `last_touch = epoch`. The zone naturally falls into `cold` at point c—consistent.
+- **If the repo is not a git repo** (`.git/` absent at root): skip activity signal and fall back to historical two-tier weighting (never audited = high, otherwise random). Announce *"Non-git repo: activity signal unavailable; using degraded weighting."*
 
-**c. Calculer `last_audit_zone` par zone** :
-- Scanner les lignes history (hors `crosscut:*`) dont la zone matche exactement (chemin exact, ou `pipeline:<nom>` avec même nom).
-- `last_audit_zone = max(date)` parmi ces lignes. Pour une zone dans `zones_jamais_auditees`, ce calcul est inutile (la zone est top de toute façon).
+**c. Compute `last_audit_zone` per zone**:
+- Scan history lines (excluding `crosscut:*`) whose zone matches exactly (exact path, or `pipeline:<name>` with the same name).
+- `last_audit_zone = max(date)` among these lines. This computation is unnecessary for a zone in `never_audited_zones` (it is top priority anyway).
 
-**d. Classement** :
-- `jamais_auditee` ssi zone dans `zones_jamais_auditees`.
-- Sinon `chaude` ssi `last_touch > last_audit_zone`. **Comparer au jour** (`last_touch` est un timestamp complet, `last_audit_zone` une date) ; **égalité de jour → `chaude`** : impossible de savoir si le commit précède ou suit l'audit du même jour, et sur-prioriser une zone est le biais le moins coûteux (le rolling protège de toute façon les zones auditées récemment).
-- Sinon `froide`.
+**d. Classification**:
+- `never_audited` iff zone is in `never_audited_zones`.
+- Otherwise `hot` iff `last_touch > last_audit_zone`. **Compare by day** (`last_touch` is a full timestamp, `last_audit_zone` a date); **same day → `hot`**: whether the commit precedes or follows the same-day audit is unknowable, and over-prioritizing a zone is the cheapest bias (rolling protects recently audited zones anyway).
+- Otherwise `cold`.
 
-**Coût** : un `git log` par zone candidate. Sur Z = 40 zones, ~40 appels — quelques secondes en sélection auto, négligeable face au coût de l'audit lui-même. Sur Z > 80, le coût devient sensible ; à ce stade, le signal reste utile mais le skill peut limiter à un échantillon des top 30 zones par taille LoC (les zones < 200 LoC ont déjà été regroupées en *Inventaire des zones*, donc le filtre par taille est naturel).
+**Cost**: one `git log` per candidate zone. For Z = 40 zones, ~40 calls—a few seconds during auto-selection, negligible against the audit itself. For Z > 80, cost becomes noticeable; activity signal remains useful, but the skill may limit it to a sample of the top 30 zones by LoC (zones < 200 LoC were already grouped in *Zone inventory*, so size filtering is natural).
 
-### Cas dégénérés de la sélection
+### Degenerate selection cases
 
-- **Candidats vides** (typiquement petit projet avec un override `rolling_size` qui exclut tout) : relâcher le rolling, choisir la zone la moins récemment auditée parmi **toutes** les zones de l'inventaire. Annoncer *"Toutes les zones sont dans le rolling — j'ai pris la moins récente : `<zone>` (auditée 2026-04-22)."* À égalité, ordre alphabétique du chemin (même départage déterministe que C.6).
-- **Toutes les zones candidates sont froides** : le niveau bas est consulté, choisir la `froide` la moins récemment auditée (à égalité, ordre alphabétique du chemin). Annoncer *"Aucune zone modifiée depuis son dernier audit — re-audit d'une zone froide : `<zone>` (auditée le YYYY-MM-DD, sans activité depuis)."* Pas de blocage — l'audit a toujours un sens, ne serait-ce que pour approfondir.
-- **Inventaire vide** (`Z = 0`) : abort avec *"Aucune zone auditable détectée (chaque dossier fait < 200 LoC source ou est exclu). Le projet est-il vide, ou veux-tu auditer manuellement un chemin précis ?"*
-- **Une seule zone candidate après exclusion** : pas d'alternatives à proposer, annoncer la zone unique et demander si on lance.
+- **No candidates** (typically a small project with a `rolling_size` override excluding everything): relax rolling and choose the least recently audited zone among **all** inventory zones. Announce *"All zones are in rolling—I selected the least recent: `<zone>` (audited 2026-04-22)."* Break ties by path-alphabetical order (same deterministic tie-break as C.6).
+- **All candidate zones are cold**: consult the low tier and choose the least recently audited `cold` (break ties by path-alphabetical order). Announce *"No zone changed since its last audit—re-auditing a cold zone: `<zone>` (audited on YYYY-MM-DD, no activity since)."* Do not block—the audit remains meaningful, if only for deeper examination.
+- **Empty inventory** (`Z = 0`): abort with *"No auditable zone detected (every directory has < 200 source LoC or is excluded). Is the project empty, or do you want to audit a specific path manually?"*
+- **Only one candidate zone after exclusion**: propose no alternatives; announce the sole zone and ask whether to start.
 
-## D. Audit forcé (mode `<path>`)
+## D. Forced audit (`<path>` mode)
 
-0. Si bootstrap nécessaire (`<STATE_DIR>/maintainability_*.md` absent) : suivre la section *A. Bootstrap* avant les étapes ci-dessous.
-1. Vérifier que le chemin existe dans le projet courant.
-2. Mesurer la taille de la zone (LoC source agrégée).
-3. **Si > 5000 LoC** : refuser un audit aveugle. Annoncer la taille, proposer un sous-scope (ex. *"trop large à 6200 LoC. Sous-scopes possibles : `<path>/sub1/`, `<path>/sub2/`"*) et demander confirmation. L'utilisateur peut forcer s'il insiste, en sachant que l'audit sera moins profond.
-4. Sinon : audit direct, pas de sélection auto.
+0. If bootstrap is required (`<STATE_DIR>/maintainability_*.md` absent), follow *A. Bootstrap* before the steps below.
+1. Verify that the path exists in the current project.
+2. Measure zone size (aggregate source LoC).
+3. **If > 5000 LoC**: refuse a blind audit. Announce the size, propose a subscope (e.g. *"too large at 6200 LoC. Possible subscopes: `<path>/sub1/`, `<path>/sub2/`"*), and request confirmation. The user may force it if they insist, knowing the audit will be less deep.
+4. Otherwise: audit directly, without auto-selection.
 
-## E. Exécution de l'audit
+## E. Audit execution
 
-Pour la zone validée :
+For the approved zone:
 
-1. **Lire le code de la zone** intégralement (tous les fichiers source dans le scope).
-1bis. **Indices outillés (optionnel, dégradation gracieuse).** Avant l'examen au jugement, si des outils de détection déterministes sont présents dans l'environnement, les exécuter sur la zone pour obtenir des candidats précis et localisés (duplication, exports morts, complexité, god files). Cf. `references/dimensions.md > Outils de détection opportunistes` pour la cartographie outil↔dimension et la posture (l'outil fournit le **rappel et la localisation** ; l'agent garde le **jugement** — produire ou non le finding, sévérité, trade-off check). **Aucune dépendance dure** : outil absent → repli sur la lecture/jugement de l'étape 2.
-1ter. **Frontière d'imports (pour `ARC`).** L'audit zonal lit la zone, mais le couplage ne se voit qu'à sa frontière : compléter par les imports entrants/sortants de la zone (`rg` des imports, ou graphe si outil présent), **sans lecture intégrale hors zone**. La cohésion (feature envy, sur-fragmentation, abstraction locale) se juge ici ; le couplage profond inter-zones (cycles, co-change, instabilité × churn) relève du crosscut `ARC` (cf. `references/dimensions.md > Cadrage de la dimension ARC`).
-1quater. **Lentille composition root / niveau d'abstraction (pour `ARC`).** Si la zone contient un landmark architectural (cf. `B.5`), examiner les composition roots qu'elle possède — pas seulement l'entrypoint applicatif, aussi les roots locales de sous-systèmes. Cf. `references/dimensions.md > Composition roots et niveau d'abstraction` pour le principe (niveau d'abstraction uniforme), la barre de friction concrète exigée, et la reco bornée (constructeur/factory possédé par le sous-système, anti-wrappers).
-2. **Examiner systématiquement toutes les dimensions** du catalogue (cf. `references/dimensions.md`). Pour chacune :
-   - Chercher des occurrences concrètes du pattern dans la zone.
-   - Pour chaque occurrence : observer (fait vérifiable, fichier:ligne, contexte), évaluer la sévérité (impact × exposition, cf. `references/quality.md > Grille de sévérité`), **estimer le Δ LoC** que produirait l'application de la reco (cf. `references/quality.md > Estimation Δ LoC`).
-   - **Appliquer le trade-off check** avant de produire (cf. `references/quality.md > Quand ne PAS produire de finding`) — performance, sécurité, scalabilité, lisibilité paradoxale. Si le trade-off est significatif, ne pas produire ; sinon, annoter dans `Reco`.
-   - **Ne pas forcer la production de findings.** Une dimension peut très bien produire 0 finding si le code est propre sur cet axe.
-3. **Si un problème réel ne colle à aucune dimension** : créer un nouveau préfixe 3 lettres (cf. `references/dimensions.md > Seed des dimensions`). Documenter brièvement dans le finding pourquoi cette nouvelle catégorie.
-4. **Assignation des IDs** : suivre le mécanisme de `references/file-formats.md > Compteur d'IDs` (lire le header `<!-- id_counters: ... -->`, **le recaler sur le plus grand NNN réellement présent dans findings avant d'incrémenter** — garde-fou anti-collision si le header a dérivé, mettre à jour la ligne header). Format à 3 chiffres (`DUP-007`).
+1. **Read all zone code** (every source file in scope).
+1bis. **Tool-assisted signals (optional, graceful degradation).** Before judgment-based review, if deterministic detection tools exist in the environment, run them on the zone to obtain precise, localized candidates (duplication, dead exports, complexity, god files). See `references/dimensions.md > Opportunistic detection tools` for tool↔dimension mapping and stance (the tool supplies **recall and localization**; the agent retains **judgment**—whether to produce the finding, severity, trade-off check). **No hard dependency**: absent tool → fall back to reading/judgment in step 2.
+1ter. **Import boundary (for `ARC`).** A zone audit reads the zone, but coupling is visible only at its boundary: supplement with incoming/outgoing zone imports (`rg` imports, or a graph if available), **without fully reading outside the zone**. Assess cohesion (feature envy, over-fragmentation, local abstraction) here; deep cross-zone coupling (cycles, co-change, instability × churn) belongs to crosscut `ARC` (see `references/dimensions.md > ARC dimension framing`).
+1quater. **Composition-root/abstraction-level lens (for `ARC`).** If the zone contains an architectural landmark (see `B.5`), examine the composition roots it owns—not only the application entrypoint, but also local subsystem roots. See `references/dimensions.md > Composition roots and abstraction level` for the principle (uniform abstraction level), required concrete friction bar, and bounded recommendation (subsystem-owned constructor/factory, anti-wrappers).
+2. **Systematically examine every catalog dimension** (see `references/dimensions.md`). For each:
+   - Look for concrete pattern occurrences in the zone.
+   - For every occurrence: observe (verifiable fact, file:line, context), assess severity (impact × exposure; see `references/quality.md > Severity scale`), and **estimate the Δ LoC** produced by applying the recommendation (see `references/quality.md > Δ LoC estimate`).
+   - **Apply the trade-off check** before producing (see `references/quality.md > When NOT to produce a finding`)—performance, security, scalability, paradoxical readability. If the trade-off is significant, do not produce; otherwise annotate it in `Recommendation`.
+   - **Do not force findings.** A dimension may legitimately produce 0 findings when code is clean on that axis.
+3. **If a real problem fits no dimension**: create a new 3-letter prefix (see `references/dimensions.md > Seed dimensions`). Briefly document in the finding why this new category is needed.
+4. **ID assignment**: follow `references/file-formats.md > ID counter` (read the `<!-- id_counters: ... -->` header, **recalibrate it to the greatest NNN actually present in findings before incrementing**—collision guardrail if the header drifted; update the header line). Use 3-digit format (`DUP-007`).
 
-## F. Écritures (append-only)
+## F. Writes (append-only)
 
-1. **Append des findings** dans `## Pending` de `maintainability_findings.md`. Format strict cf. `references/file-formats.md`.
-2. **Préfixer une nouvelle ligne en tête** de `maintainability_history.md` :
+1. **Append findings** under `## Pending` in `maintainability_findings.md`. Strict format: see `references/file-formats.md`.
+2. **Prepend a new line at the top** of `maintainability_history.md`:
    ```
-   - YYYY-MM-DD — <zone> — N findings (X HIGH, Y MED, Z LOW) (pending)
+   - YYYY-MM-DD — <area> — N findings (X HIGH, Y MED, Z LOW) (pending)
    ```
-3. **Pas de trim.** History est append-only — le fichier accumule sur la durée de vie du projet. La taille du rolling actif `N` est appliquée à la lecture (vue sur les `N` premières lignes), jamais à l'écriture.
+3. **No trimming.** History is append-only—the file accumulates over the project's lifetime. Apply active rolling size `N` when reading (view over the first `N` lines), never when writing.
 
-### Cas zone propre (0 findings)
+### Clean-zone case (0 findings)
 
-Si l'audit produit zéro finding (zone réellement clean sur toutes les dimensions) :
+If the audit produces zero findings (zone genuinely clean across all dimensions):
 
-- **Écrire quand même la ligne history**, format adapté :
+- **Still write the history line**, using the adapted format:
   ```
   - YYYY-MM-DD — <zone> — 0 findings (clean)
   ```
-- Ne **rien appender** dans `maintainability_findings.md` (pas de pending à créer).
-- Sortie en chat : utiliser le template `audit:clean`.
+- Append **nothing** to `maintainability_findings.md` (create no pending entry).
+- Chat output: use the `audit:clean` template.
 
-L'écriture de la ligne history est **importante** : sans elle, la zone serait re-proposée trop tôt et la couverture historique perdrait l'info que la zone a été examinée.
+Writing the history line is **important**: without it, the zone would be reproposed too soon and historical coverage would lose the fact that the zone was examined.
 
-## G. Sortie en chat (post-audit)
+## G. Chat output (post-audit)
 
-- Audit avec findings → template `audit:summary`.
-- Audit sans finding (zone propre) → template `audit:clean`.
-- Suite : la proposition de double-check autonome (cf. H ci-dessous).
+- Audit with findings → `audit:summary` template.
+- Audit without findings (clean zone) → `audit:clean` template.
+- Next: autonomous double-check proposal (see H below).
 
-## H. Proposition de double-check autonome (post-audit)
+## H. Autonomous double-check proposal (post-audit)
 
-Après le résumé en chat, si l'audit a produit ≥ 1 finding, proposer trois options à l'utilisateur via le template `audit:proposition` (3 options : quick-wins / heavy / rien), puis attendre sa réponse.
+After the chat summary, if the audit produced ≥ 1 finding, offer the user three options via the `audit:proposition` template (3 options: quick-wins / heavy / nothing), then wait for their answer.
 
-**Critères de sélection des panels** :
+**Panel-selection criteria**:
 
-- **(a) Quick-wins** : panel de 3 à 5 findings « bas effort, fix direct ».
-  - Sévérité LOW en priorité, complétée par des MED si nécessaire pour atteindre 3.
-  - `|Δ LoC|` faible (≤ 30) ou reco mono-fichier sans blast radius identifiable.
-  - **Pas de finding HIGH dans ce panel** — un HIGH n'est jamais un quick-win.
-- **(b) Heavy finding** : un seul finding, le plus structurant.
-  - Sévérité HIGH en priorité (sinon le MED de plus large scope).
-  - Plus large scope d'abord : god file > duplication structurante 3+ > drift transverse > complexité locale.
-  - Tie-break : `|Δ LoC|` estimé le plus élevé.
-- **(c) Rien** : l'utilisateur verra plus tard.
+- **(a) Quick-wins**: panel of 3–5 “low effort, direct fix” findings.
+  - Prioritize LOW severity; supplement with MED as needed to reach 3.
+  - Small `|Δ LoC|` (≤ 30) or single-file recommendation with no identifiable blast radius.
+  - **No HIGH finding in this panel**—a HIGH is never a quick-win.
+- **(b) Heavy finding**: one finding, the most structural.
+  - Prioritize HIGH severity (otherwise the widest-scope MED).
+  - Widest scope first: god file > structural duplication 3+ > cross-cutting drift > local complexity.
+  - Tie-break: greatest estimated `|Δ LoC|`.
+- **(c) Nothing**: the user will revisit later.
 
-**Cas dégénérés** :
+**Degenerate cases**:
 
-- 0 finding : ne pas afficher cette proposition (déjà couvert par le cas zone propre).
-- 1 ou 2 findings : remplacer par le template `audit:proposition-min` (question simple sur 1 ID).
-- Aucun candidat ne tient les critères de quick-win (e.g. tous les findings sont HIGH avec gros blast radius) : ne proposer que (b) et (c).
-- Aucun finding HIGH ni MED de gros scope : pour (b), proposer le finding au plus grand `|Δ LoC|` estimé, en avertissant que ce n'est pas un finding « lourd » au sens classique.
+- 0 findings: do not show this proposal (already covered by the clean-zone case).
+- 1 or 2 findings: replace with the `audit:proposition-min` template (simple question about 1 ID).
+- No candidate meets quick-win criteria (e.g. every finding is HIGH with a large blast radius): offer only (b) and (c).
+- No HIGH finding or wide-scope MED: for (b), propose the finding with greatest estimated `|Δ LoC|`, warning that it is not “heavy” in the conventional sense.
 
-**Exécution selon le choix utilisateur** :
+**Execution based on user choice**:
 
-- **(a) Quick-wins** : pour chaque finding du panel, exécuter le flux de `references/mode-double-check.md` (lecture du fichier, trace, blast radius, Δ LoC affiné, reco affinée, verdict). Écrire la section `Double-check (date)` dans chaque entrée du fichier findings. **Sortie agrégée** via `double-check:autonomous-batch`, suivie de `double-check:autonomous-batch-proposition` (cf. *I. Action post-proposition batch* ci-dessous).
-- **(b) Heavy finding** : exécuter le flux de `references/mode-double-check.md` sur le finding sélectionné. Sortie complète via `double-check:output` standard, suivie de `double-check:proposition` (cf. `references/mode-double-check.md > Action selon le choix utilisateur`).
-- **(c) Rien** : terminer la commande. Aucune écriture supplémentaire.
+- **(a) Quick-wins**: for each panel finding, execute the `references/mode-double-check.md` flow (file read, trace, blast radius, refined Δ LoC, refined recommendation, verdict). Write the `Double-check (date)` section in each findings-file entry. **Aggregate output** via `double-check:autonomous-batch`, followed by `double-check:autonomous-batch-proposition` (see *I. Post-batch-proposal action* below).
+- **(b) Heavy finding**: execute the `references/mode-double-check.md` flow on the selected finding. Full output via standard `double-check:output`, followed by `double-check:proposition` (see `references/mode-double-check.md > Action based on the user's choice`).
+- **(c) Nothing**: end the command. No additional writes.
 
-## I. Action post-proposition batch
+## I. Post-batch-proposal action
 
-Déclenché par la proposition `double-check:autonomous-batch-proposition` (suite à `(a) Quick-wins` ci-dessus ou à `double-check B<n>` depuis `references/mode-list.md`). Selon le choix utilisateur :
+Triggered by the `double-check:autonomous-batch-proposition` proposal (after `(a) Quick-wins` above or `double-check B<n>` from `references/mode-list.md`). Based on user choice:
 
-- **Fix tous les GO** :
-  1. Établir l'ordering (règles dans `references/templates.md > double-check:autonomous-batch-proposition`).
-  2. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée`.
-  3. Plan global affiché, OK explicite. Si OK, exécuter dans l'ordre.
-  4. Avant chaque marquage `Resolution`, lancer la suite de tests. Tests OK → flux résolution intra-session. Tests KO → arrêt, ne pas marquer.
-  5. Cascade re-check automatique après chaque résolution (cf. `references/cascade.md`).
-  6. Si variante mix GO+NO-GO : archiver les NO-GO restants dans la foulée (move Pending → Resolved compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, lignes history complétées, cap Resolved respecté).
-  7. Récap final via `cascade:recap-batch`.
-- **Fix un seul** : étapes 2-5 ci-dessus sur le finding choisi.
-- **Archiver les NO-GO** (variante mix, archive partielle) ou **Archiver tous** (variante tous NO-GO) : pour chaque NO-GO, move Pending → Resolved au format compact, `Resolution: archivé après double-check (NO-GO motivé : <raison>)`, ligne history complétée. Cap Resolved respecté.
-- **Rien** / **Garder pending** : terminer sans écriture supplémentaire.
+- **Fix all GO**:
+  1. Establish ordering (rules in `references/templates.md > double-check:autonomous-batch-proposition`).
+  2. Plan per finding (1–3 lines: touched files, order, expected Δ LoC)—reuse `Refined recommendation`.
+  3. Display global plan; require explicit OK. If OK, execute in order.
+  4. Before every `Resolution` mark, run the test suite. Tests OK → in-session resolution flow. Tests KO → stop; do not mark.
+  5. Automatic cascade re-check after each resolution (see `references/cascade.md`).
+  6. For mixed GO+NO-GO: immediately archive remaining NO-GOs (move Pending → compact Resolved, `Resolution: archived after double-check (NO-GO rationale: <reason>)`, complete history lines, honor Resolved cap).
+  7. Final recap via `cascade:recap-batch`.
+- **Fix one**: apply steps 2–5 above to the selected finding.
+- **Archive NO-GOs** (mixed variant, partial archive) or **Archive all** (all-NO-GO variant): for each NO-GO, move Pending → Resolved in compact format, add `Resolution: archived after double-check (NO-GO rationale: <reason>)`, and complete the history line. Honor the Resolved cap.
+- **Nothing** / **Keep pending**: finish without additional writes.
 
-## Invariants de fin de mode (audit auto ou forcé)
+## End-of-mode invariants (auto or forced audit)
 
-Avant de rendre la main, valider (une case **non applicable** au cas courant est considérée cochée ; cf. SKILL.md > *Invariants de fin de mode* pour la règle transverse) :
+Before returning control, validate (an item **not applicable** to the current case counts as checked; see SKILL.md > *End-of-mode invariants* for the cross-cutting rule):
 
-- Findings appendés dans `## Pending` de `maintainability_findings.md` — un par finding produit (ou aucun si zone propre).
-- Header `<!-- id_counters: ... -->` incrémenté pour chaque préfixe utilisé.
-- Ligne préfixée en tête de `maintainability_history.md`. **Pas de trim** — history est append-only.
-- Si bootstrap a eu lieu : fichiers `<STATE_DIR>/maintainability_*.md` créés avec le contenu initial.
-- Si l'utilisateur a choisi un panel à la proposition (H) : invariants des modes correspondants (`references/mode-double-check.md` pour single, *Résolution intra-session* de `references/mode-update.md` pour fix) applicables.
+- Findings appended under `## Pending` in `maintainability_findings.md`—one per produced finding (or none for a clean zone).
+- `<!-- id_counters: ... -->` header incremented for every used prefix.
+- Line prepended at the top of `maintainability_history.md`. **No trimming**—history is append-only.
+- If bootstrap occurred: `<STATE_DIR>/maintainability_*.md` files created with initial content.
+- If the user selected a panel in proposal H: corresponding mode invariants apply (`references/mode-double-check.md` for single, *In-session resolution* in `references/mode-update.md` for fix).

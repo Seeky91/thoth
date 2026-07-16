@@ -6,95 +6,95 @@ description: "Measure, audit, track, deep-check, and resolve software performanc
 
 # Performance skill
 
-## Frontière
+## Scope
 
-Mesurer, diagnostiquer, suivre et résoudre les problèmes de performance sans transformer des intuitions statiques en conclusions. **Le skill mesure d'abord** : aucun finding persistant sans workload explicite, baseline chiffrée et preuve localisée. Il ne modifie pas le code audité pendant l'audit ou le double-check ; un fix n'arrive qu'après verdict et confirmation explicite, puis doit être validé par tests et mesure avant/après comparable.
+Measure, diagnose, track, and resolve performance problems without turning static intuitions into conclusions. **The skill measures first**: no persistent finding without an explicit workload, quantified baseline, and localized evidence. It does not modify audited code during an audit or double-check; a fix occurs only after a verdict and explicit confirmation, then must be validated by tests and comparable before/after measurements.
 
-Inclure la latence, le throughput, CPU, mémoire/allocations, I/O, contention/concurrence et scalabilité sous charge mesurée. Exclure les audits généraux de maintenabilité, sécurité, accessibilité et choix de stack ; vérifier la correction et la maintenabilité comme garde-fous du changement, sans en faire des axes d'audit autonomes.
+Include latency, throughput, CPU, memory/allocations, I/O, contention/concurrency, and scalability under measured load. Exclude general maintainability, security, accessibility, and stack-selection audits; verify correctness and maintainability as change guardrails, without making them independent audit axes.
 
-**Exception d'orchestration :** une invocation explicite du skill `performance-cycle` vaut confirmation bornée en amont pour sélectionner un workload local sûr et non ambigu, double-checker un finding, appliquer le fix d'un verdict GO, persister sa résolution si toutes les preuves avant/après sont satisfaites et archiver un verdict NO-GO sans scénario crédible de réévaluation. Dans ce cadre seulement, les propositions de sélection, de fix, de résolution et d'archivage deviennent des annonces d'avancement ; les limites de charge externe, de comparabilité, de validation et de Git restent inchangées.
+**Orchestration exception:** an explicit invocation of the `performance-cycle` skill counts as bounded advance confirmation to select a safe, unambiguous local workload, double-check a finding, apply the fix from a GO verdict, persist its resolution if all before/after evidence requirements are satisfied, and archive a NO-GO verdict with no credible reevaluation scenario. Only in this context do selection, fix, resolution, and archival proposals become progress announcements; external-load, comparability, validation, and Git limits remain unchanged.
 
-## Références
+## References
 
-Ce `SKILL.md` est un **routeur mince**. Lire les références requises par le mode courant, sans charger les autres :
+This `SKILL.md` is a **thin router**. Read the references required by the current mode without loading the others:
 
-- `references/doctrine.md` — contrat de workload, hiérarchie de preuve, hypothèses et raisonnement d'exposition, fiabilité des mesures, axes, sévérité, anti-bruit et garde-fou de maintenabilité. **Lire avant tout audit, double-check, update ou fix.**
-- `references/mode-audit.md` — bootstrap, inventaire, triage de matérialité et sélection automatique, audit ciblé par path ou feature, mesure, profiling et production des findings.
-- `references/mode-list.md` — tableau de bord lecture seule.
-- `references/mode-update.md` — re-mesure des pendings et gestion des workloads ou scopes devenus stales.
-- `references/mode-double-check.md` — reproduction approfondie, blast radius, verdict et résolution mesurée.
-- `references/file-formats.md` — formats normatifs des trois fichiers d'état et cycle de vie d'un finding.
-- `references/templates.md` — formats normatifs des sorties chat. **Lire avant chaque sortie d'un mode.**
+- `references/doctrine.md` — workload contract, evidence hierarchy, hypotheses and exposure reasoning, measurement reliability, axes, severity, noise control, and maintainability guardrail. **Read before any audit, double-check, update, or fix.**
+- `references/mode-audit.md` — bootstrap, inventory, materiality triage and automatic selection, path- or feature-targeted audit, measurement, profiling, and finding production.
+- `references/mode-list.md` — read-only dashboard.
+- `references/mode-update.md` — remeasurement of pending findings and handling of stale workloads or scopes.
+- `references/mode-double-check.md` — in-depth reproduction, blast radius, verdict, and measured resolution.
+- `references/file-formats.md` — normative formats for the three state files and finding lifecycle.
+- `references/templates.md` — normative chat output formats. **Read before every mode output.**
 
-## Dispatch des modes
+## Mode dispatch
 
-Déduire le mode de l'intention utilisateur, indépendamment de la syntaxe propre à l'agent :
+Infer the mode from user intent, independently of agent-specific syntax:
 
-| Intention | Mode | Playbook | Entrée |
+| Intent | Mode | Playbook | Input |
 |---|---|---|---|
-| Afficher le tableau de bord | **list** | `references/mode-list.md` | Aucune |
-| Re-mesurer les pendings | **update** | `references/mode-update.md` | Aucune |
-| Approfondir un finding | **double-check** | `references/mode-double-check.md` | ID `PERF-NNN` |
-| Auditer un chemin | **audit path** | `references/mode-audit.md` | Path existant |
-| Auditer une feature | **audit feature** | `references/mode-audit.md` | `feature <description>` ou description fonctionnelle non ambiguë |
-| Chercher automatiquement la cible la plus pertinente | **audit auto** | `references/mode-audit.md` | Aucune |
+| Show the dashboard | **list** | `references/mode-list.md` | None |
+| Remeasure pending findings | **update** | `references/mode-update.md` | None |
+| Investigate a finding | **double-check** | `references/mode-double-check.md` | `PERF-NNN` ID |
+| Audit a path | **audit path** | `references/mode-audit.md` | Existing path |
+| Audit a feature | **audit feature** | `references/mode-audit.md` | `feature <description>` or unambiguous functional description |
+| Automatically find the most relevant target | **audit auto** | `references/mode-audit.md` | None |
 
-Accepter les formulations compatibles `/performance`, `/performance list`, `/performance update`, `/performance double-check PERF-001`, `/performance src/api` et `/performance feature checkout`. Avec Codex, utiliser le texte qui accompagne `$performance` pour choisir le même mode.
+Accept compatible forms `/performance`, `/performance list`, `/performance update`, `/performance double-check PERF-001`, `/performance src/api`, and `/performance feature checkout`. With Codex, use the text accompanying `$performance` to choose the same mode.
 
-Règles de parsing :
+Parsing rules:
 
-1. Un argument qui résout vers un path existant déclenche `audit path`.
-2. Le préfixe `feature` déclenche `audit feature` avec le reste du texte.
-3. Un texte libre décrivant clairement un comportement produit déclenche `audit feature`.
-4. Une demande de fix direct (`fix PERF-001`, « corrige PERF-001 ») route vers `double-check` sur cet ID : il n'existe volontairement pas de mode fix autonome, la re-baseline et le verdict précèdent toute modification.
-5. Un argument ressemblant à un path mais inexistant, un ID invalide ou un flag inconnu exige une clarification ; ne pas réinterpréter silencieusement.
-6. Sans précision, choisir `audit auto`.
+1. An argument resolving to an existing path triggers `audit path`.
+2. The `feature` prefix triggers `audit feature` with the remaining text.
+3. Free text clearly describing product behavior triggers `audit feature`.
+4. A direct fix request (`fix PERF-001`, French: "corrige PERF-001") routes to `double-check` for that ID: there is deliberately no standalone fix mode; re-baselining and the verdict precede any modification.
+5. A path-like but nonexistent argument, invalid ID, or unknown flag requires clarification; do not silently reinterpret it.
+6. Without specifics, choose `audit auto`.
 
-## Détection du root projet
+## Project root detection
 
-Avant tout dispatch, confirmer le root à partir de `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/` ou `.svn/`.
+Before any dispatch, confirm the root from `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/`, or `.svn/`.
 
-- Marqueur dans le `cwd` : continuer.
-- Marqueur dans un parent : annoncer le root détecté et demander de relancer depuis ce root ou de confirmer l'opération ici.
-- Aucun marqueur : arrêter et demander de lancer depuis un projet.
-- Path explicite : rattacher l'état au root le plus proche de ce path.
+- Marker in `cwd`: continue.
+- Marker in a parent: announce the detected root and ask to rerun from that root or confirm the operation here.
+- No marker: stop and ask to run from a project.
+- Explicit path: attach state to the root nearest that path.
 
-## Répertoire d'état
+## State directory
 
-`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, partagé entre Claude Code et Codex. Le créer seulement dans un mode qui écrit. Les noms non qualifiés désignent toujours :
+`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, shared by Claude Code and Codex. Create it only in a mode that writes. Unqualified names always mean:
 
 - `<STATE_DIR>/performance_history.md`
 - `<STATE_DIR>/performance_findings.md`
 - `<STATE_DIR>/performance_resolved_archive.md`
 
-Le mode `list` ne crée rien.
+The `list` mode creates nothing.
 
-## Conventions transverses
+## Cross-cutting conventions
 
-1. **Date déterministe.** Obtenir chaque date écrite ou comparée avec `date +%F`. Si la commande est indisponible, le signaler au lieu d'inventer.
-2. **Écritures en delta.** Lire l'état tôt, le relire juste avant écriture, puis insérer ou déplacer uniquement les blocs ciblés. Ne jamais régénérer un fichier entier de mémoire.
-3. **Git sans historique.** Lire librement `git log/diff/show/blame/status`. Éditer l'arbre seulement pendant un fix confirmé. Ne jamais exécuter `git add`, `commit` ou `push`.
-4. **Audit source en lecture seule.** L'audit et le double-check peuvent produire des artefacts de build/profiling ou des scripts éphémères sous `/tmp`, mais ne modifient ni le code source ni les benchmarks versionnés.
-5. **Pas de charge externe implicite.** Ne jamais lancer de load test contre la production, un service distant, des données réelles ou une opération facturable sans autorisation explicite. Préférer le plus petit workload local représentatif.
-6. **Comparabilité avant conclusion.** Comparer uniquement des mesures obtenues avec même workload, configuration, mode de build, taille d'entrée et environnement suffisamment stable. Sinon conclure `inconclusif`.
-7. **État sans secrets.** Sanitiser les commandes et workloads persistés : aucun token, secret, header d'authentification, payload personnel ou valeur d'environnement sensible.
+1. **Deterministic date.** Obtain every written or compared date with `date +%F`. If the command is unavailable, report it instead of inventing one.
+2. **Delta writes.** Read state early, reread it immediately before writing, then insert or move only targeted blocks. Never regenerate an entire file from memory.
+3. **Git without history mutation.** Freely read `git log/diff/show/blame/status`. Edit the tree only during a confirmed fix. Never run `git add`, `commit`, or `push`.
+4. **Read-only source audit.** Audits and double-checks may produce build/profiling artifacts or ephemeral scripts under `/tmp`, but do not modify source code or versioned benchmarks.
+5. **No implicit external load.** Never run a load test against production, a remote service, real data, or a billable operation without explicit authorization. Prefer the smallest representative local workload.
+6. **Comparability before conclusions.** Compare only measurements obtained with the same workload, configuration, build mode, input size, and a sufficiently stable environment. Otherwise conclude `inconclusive`.
+7. **Secret-free state.** Sanitize persisted commands and workloads: no token, secret, authentication header, personal payload, or sensitive environment value.
 
-## Doctrine d'évaluation
+## Evaluation doctrine
 
-Lire `references/doctrine.md` avant toute décision. Invariants essentiels :
+Read `references/doctrine.md` before any decision. Essential invariants:
 
-- Un signal statique ou un profiler hit est un candidat, jamais un finding à lui seul.
-- La sélection auto classe par matérialité plausible (exposition sourcée × ordre de grandeur de coût), jamais par simple disponibilité d'un workload ; un scope au plafond d'exposition démontrable se consigne `skipped (exposure-capped)` sans harnais.
-- Une hypothèse réfutée par la mesure ou un plafond consigné est un audit réussi, pas un échec.
-- Un finding exige une baseline reproductible, une métrique, une exposition et une preuve reliant le coût à une localisation ou relation concrète.
-- Un gain inférieur au bruit de mesure n'est pas un gain.
-- Une optimisation qui dégrade inutilement correction ou maintenabilité est rejetée ou reformulée.
-- Une spécialisation moins abstraite peut être acceptée si son gain est matériel, mesuré, localisé et documenté.
+- A static signal or profiler hit is a candidate, never a finding by itself.
+- Auto selection ranks by plausible materiality (sourced exposure × cost order of magnitude), never merely by workload availability; a scope with a demonstrable exposure ceiling is recorded as `skipped (exposure-capped)` without a harness.
+- A hypothesis refuted by measurement or a recorded ceiling is a successful audit, not a failure.
+- A finding requires a reproducible baseline, a metric, exposure, and evidence linking the cost to a concrete location or relationship.
+- A gain below measurement noise is not a gain.
+- An optimization that needlessly degrades correctness or maintainability is rejected or reframed.
+- A less abstract specialization may be accepted if its gain is material, measured, localized, and documented.
 
-## Sorties chat
+## Chat outputs
 
-Lire `references/templates.md` avant chaque sortie. Les modes qui écrivent terminent par `Files mis à jour : ...`; `list` reste strictement read-only. Séparer le récapitulatif de toute proposition d'action.
+Read `references/templates.md` before every output. Modes that write end with `Files updated: ...`; `list` remains strictly read-only. Separate the summary from any proposed action.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-Lire et cocher la checklist en fin du playbook courant. Une case non applicable est considérée cochée. Si une mesure, un test ou une écriture attendue n'a pas pu être réalisé, annoncer l'état partiel et sa cause ; ne jamais présenter un résultat incomplet comme validé.
+Read and check the checklist at the end of the current playbook. A non-applicable item counts as checked. If an expected measurement, test, or write could not be performed, announce the partial state and its cause; never present an incomplete result as validated.

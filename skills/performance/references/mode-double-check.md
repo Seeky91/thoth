@@ -1,74 +1,74 @@
-# Mode : double-check
+# Mode: double-check
 
-Référence chargée avec un ID `PERF-NNN`. Lire `references/doctrine.md`, `references/file-formats.md` et le fichier source ciblé intégralement. Approfondir un finding existant sans produire de nouveau finding.
+Reference loaded with a `PERF-NNN` ID. Read `references/doctrine.md`, `references/file-formats.md`, and the complete targeted source file. Investigate an existing finding without producing a new finding.
 
-## Flux d'analyse
+## Analysis flow
 
-1. Localiser l'entrée dans `## Pending`. ID absent, résolu ou invalide : demander un ID pending valide.
-2. Rejouer le workload et protocole enregistrés aussi près que possible de la baseline. **Clause same-session** : si la baseline (et le profil) viennent d'être mesurés dans la même session et que ni le code du scope, ni le workload, ni l'environnement n'ont changé depuis, les réutiliser au lieu de re-mesurer et le déclarer dans la bullet (`reproduction : baseline same-session réutilisée`) ; le double-check se concentre alors sur l'attribution alternative, le blast radius, les risques et l'acceptation. Au moindre doute sur un de ces invariants, re-mesurer.
-3. Vérifier la comparabilité et la variance. Si la baseline ne se reproduit pas au-delà de la dispersion attendue, chercher la cause avant toute recommandation.
-4. Lire tous les paths du scope, les call sites, tests et frontières I/O impliqués.
-5. Re-profiler le workload et confirmer que le coût attribué reste dominant — sauf réutilisation same-session d'un profil frais.
-6. Tester l'hypothèse sans modifier le projet si possible : option runtime, expérience contrôlée, requête isolée ou harness sous `/tmp`. Une modification source appartient au flux de fix après confirmation.
-7. Évaluer :
-   - reproductibilité de la baseline ;
-   - attribution du coût et alternatives plausibles ;
-   - blast radius fonctionnel et surfaces publiques ;
-   - risque concurrence/mémoire/I/O déplacé ailleurs ;
-   - effort `S` (≤2h), `M` (≤1j), `L` (>1j) ;
-   - garde-fou de maintenabilité ;
-   - protocole avant/après et acceptation affinée.
-8. Produire un verdict :
-   - `GO` : preuve stable, fix borné, validation crédible ;
-   - `GO-mais-après-X` : dépendance préalable explicite ;
-   - `NO-GO` : hypothèse réfutée, coût non actionnable ou compromis injustifié ;
-   - `INCONCLUSIF` : mesure ou attribution insuffisante.
-9. Proposer une reclassification de sévérité si l'impact/exposition mesuré a changé. Conserver l'ID.
+1. Locate the entry in `## Pending`. If the ID is absent, resolved, or invalid, request a valid pending ID.
+2. Replay the recorded workload and protocol as close as possible to the baseline. **Same-session clause:** if the baseline (and profile) were just measured in the same session and neither scope code, workload, nor environment has changed since, reuse them instead of remeasuring and declare this in the bullet (`reproduction: reused same-session baseline`); the double-check then focuses on alternative attribution, blast radius, risks, and acceptance. At the slightest doubt about any invariant, remeasure.
+3. Verify comparability and variance. If the baseline does not reproduce beyond expected dispersion, investigate the cause before any recommendation.
+4. Read every path in scope, call sites, tests, and involved I/O boundaries.
+5. Re-profile the workload and confirm the attributed cost remains dominant—unless reusing a fresh same-session profile.
+6. Test the hypothesis without modifying the project if possible: runtime option, controlled experiment, isolated query, or harness under `/tmp`. A source modification belongs to the post-confirmation fix flow.
+7. Evaluate:
+   - baseline reproducibility;
+   - cost attribution and plausible alternatives;
+   - functional blast radius and public surfaces;
+   - risk of moving concurrency/memory/I/O elsewhere;
+   - effort `S` (≤2h), `M` (≤1d), `L` (>1d);
+   - maintainability guardrail;
+   - refined before/after protocol and acceptance.
+8. Produce a verdict:
+   - `GO`: stable evidence, bounded fix, credible validation;
+   - `GO-but-after-X`: explicit prerequisite;
+   - `NO-GO`: refuted hypothesis, unactionable cost, or unjustified tradeoff;
+   - `INCONCLUSIVE`: insufficient measurement or attribution.
+9. Propose a severity reclassification if measured impact/exposure changed. Keep the ID.
 
-## Écriture du Double-check
+## Writing the Double-check
 
-Ajouter après `Status` une bullet unique :
+Add one bullet after `Status`:
 
 ```markdown
-- **Double-check (YYYY-MM-DD) :** reproduction <valeurs> ; comparabilité <état> ; profil <preuve> ; blast radius <résumé> ; risques <résumé> ; effort <S|M|L> ; acceptation affinée <critère> ; verdict <...> ; plan affiné <...>.
+- **Double-check (YYYY-MM-DD):** reproduction <values>; comparability <state>; profile <evidence>; blast radius <summary>; risks <summary>; effort <S|M|L>; refined acceptance <criterion>; verdict <...>; refined plan <...>.
 ```
 
-Amender localisation, workload, acceptation ou sévérité uniquement avec justification dans cette bullet. Utiliser `double-check:output`, puis la proposition adaptée de `double-check:proposition`.
+Amend location, workload, acceptance, or severity only with justification in this bullet. Use `double-check:output`, then the appropriate `double-check:proposition`.
 
-## Action selon le choix utilisateur
+## Action according to user choice
 
-### Fix maintenant — GO ou GO-mais-après-X
+### Fix now — GO or GO-but-after-X
 
-1. Présenter un plan court : fichiers, ordre, mécanisme attendu, tests, benchmark et risque de maintenabilité.
-2. Attendre un OK explicite avant toute modification source.
-3. Re-capturer si nécessaire une mesure `avant` immédiate avec le protocole enregistré.
-4. Implémenter le plus petit changement crédible sans toucher l'index ou l'historique git.
-5. Lancer tests ciblés puis suite/lint appropriés.
-6. Rejouer exactement le benchmark comparable et calculer gain + dispersion.
-7. Inspecter le diff avec `references/doctrine.md > Garde-fou de maintenabilité`.
-8. Issues :
-   - tests OK + acceptation satisfaite + gain au-delà du bruit + garde-fou OK → utiliser `resolution:confirm` ; après confirmation, déplacer au format Resolved compact, compléter history et appliquer le cap ;
-   - tests KO, gain absent/inconclusif ou dette injustifiée → ne pas marquer résolu, utiliser `resolution:failed`, conserver le diff pour review sans revert automatique, lister les fichiers touchés et proposer `git stash push -- <fichiers>` sans l'exécuter.
-9. Repérer les autres pendings partageant le workload ou les paths et recommander `update`. Ne pas les résoudre sans re-mesure.
+1. Present a short plan: files, order, expected mechanism, tests, benchmark, and maintainability risk.
+2. Wait for explicit OK before any source modification.
+3. If needed, recapture an immediate `before` measurement with the recorded protocol.
+4. Implement the smallest credible change without touching the Git index or history.
+5. Run targeted tests, then appropriate suite/lint.
+6. Replay exactly the comparable benchmark and calculate gain + dispersion.
+7. Inspect the diff using `references/doctrine.md > Maintainability guardrail`.
+8. Outcomes:
+   - tests OK + acceptance satisfied + gain beyond noise + guardrail OK → use `resolution:confirm`; after confirmation, move to compact Resolved format, complete history, and apply the cap;
+   - tests fail, gain absent/inconclusive, or unjustified debt → do not mark resolved, use `resolution:failed`, keep the diff for review without automatic revert, list touched files, and propose `git stash push -- <files>` without executing it.
+9. Find other pending findings sharing the workload or paths and recommend `update`. Do not resolve them without remeasurement.
 
 ### NO-GO
 
-Proposer :
+Propose:
 
-- archiver au format Resolved compact avec `Resolution : archivé après double-check (NO-GO : <raison>)`, `Validation : N/A — hypothèse réfutée ou compromis injustifié` ;
-- ou garder Pending si une re-évaluation future est crédible.
+- archive in compact Resolved format with `Resolution: archived after double-check (NO-GO: <reason>)`, `Validation: N/A — hypothesis refuted or tradeoff unjustified`;
+- or keep Pending if future reevaluation is credible.
 
-### INCONCLUSIF
+### INCONCLUSIVE
 
-Garder Pending. Expliquer la mesure, donnée ou condition qui manque ; ne pas proposer de fix.
+Keep Pending. Explain the missing measurement, data, or condition; do not propose a fix.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-- Baseline rejouée, réutilisée via la clause same-session (déclarée), ou impossibilité explicitement documentée.
-- Attribution re-vérifiée avec profil ou expérience.
-- Section Double-check écrite en delta.
-- Verdict cohérent avec la qualité de preuve.
-- Aucun code modifié avant OK explicite.
-- Après fix : tests + benchmark comparable + garde-fou maintenabilité exécutés.
-- Finding résolu seulement après validation complète et confirmation.
-- Findings voisins jamais auto-résolus sans mesure.
+- Baseline replayed, reused via the declared same-session clause, or impossibility explicitly documented.
+- Attribution re-verified with a profile or experiment.
+- Double-check section written as a delta.
+- Verdict consistent with evidence quality.
+- No code modified before explicit OK.
+- After fix: tests + comparable benchmark + maintainability guardrail executed.
+- Finding resolved only after complete validation and confirmation.
+- Neighboring findings never auto-resolved without measurement.

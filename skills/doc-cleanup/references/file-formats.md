@@ -1,100 +1,100 @@
-# Format d'état & templates de sortie
+# State format & output templates
 
-Référence chargée quand un mode écrit l'état ou produit une sortie chat.
+Reference loaded when a mode writes state or produces chat output.
 
 ## `<STATE_DIR>/doccleanup_coverage.md`
 
-**Ledger de couverture append-only.** Une ligne par passe de nettoyage, **préfixée en tête** (plus récent en premier). Jamais trimmé.
+**Append-only coverage ledger.** One line per cleanup pass, **prepended at the top** (newest first). Never trimmed.
 
-### Pourquoi markdown, pourquoi un seul fichier
+### Why Markdown, why one file
 
-L'état est en markdown (lisible, git-diffable, éditable à la main) et **minimal par choix** : le livrable du skill est le *code nettoyé*, pas un registre de findings. Le ledger ne sert qu'à **deux choses** — savoir où reprendre une campagne (couverture par zone) et garder une trace datée des passes.
+State uses Markdown (readable, git-diffable, hand-editable) and is **minimal by design**: the skill's deliverable is *cleaned code*, not a findings registry. The ledger serves only **two purposes**—knowing where to resume a campaign (coverage by zone) and keeping a dated record of passes.
 
 ### Format
 
 ```markdown
 # Doc-cleanup coverage
 
-- 2026-06-25 — services/api/ — project — 34 supprimés, 5 renames, 2 docs dé-driftées — tests OK
-- 2026-06-25 — src/utils/format.ts — zone — 8 supprimés, 1 rename — tests OK
-- 2026-06-24 — session (7 files) — session — 22 supprimés, 3 renames, 1 dé-driftée — tests OK
-- 2026-06-23 — services/billing/ — project — 0 supprimés (déjà propre) — tests OK
+- 2026-06-25 — services/api/ — project — 34 deleted, 5 renames, 2 docs de-drifted — tests OK
+- 2026-06-25 — src/utils/format.ts — zone — 8 deleted, 1 rename — tests OK
+- 2026-06-24 — session (7 files) — session — 22 deleted, 3 renames, 1 de-drifted — tests OK
+- 2026-06-23 — services/billing/ — project — 0 deleted (already clean) — tests OK
 ```
 
-- Ligne : `- YYYY-MM-DD — <scope> — <mode> — <N> supprimés, <M> renames, <K> docs dé-driftées — <validation>`
-- `<scope>` = chemin (dossier/fichier) pour `project`/`zone` ; `session (<N> files)`, `session --touched (<N> files)` ou `session --files (<N> files)` pour `session`.
+- Line: `- YYYY-MM-DD — <scope> — <mode> — <N> deleted, <M> renames, <K> docs de-drifted — <validation>`
+- `<scope>` = path (directory/file) for `project`/`zone`; `session (<N> files)`, `session --touched (<N> files)`, or `session --files (<N> files)` for `session`.
 - `<mode>` ∈ `project` | `zone` | `session`.
-- `<validation>` = `tests OK` | `tests KO (<détail>)` | `validation dégradée (<ce qui a tourné>)`.
-- Stats à 0 acceptées (`0 supprimés (déjà propre)`) — c'est une couverture valide, elle mémorise que la zone a été vue.
-- **Couverture (reprise `project`)** : `zones_couvertes` = chemins des lignes `project`/`zone` dont la validation n'est **pas** `tests KO` — une passe en échec garde sa trace (la ligne s'écrit quand même) mais ne compte pas comme couverture : la zone revient en pending à la reprise. `validation dégradée` compte comme couverture (le nettoyage a bien eu lieu ; c'est l'environnement qui manque de tests). Les lignes `session` ne comptent pas comme couverture de zone (cf. `references/mode-project.md > C`).
-- **Staleness** : la date de couverture sert aussi à **revalider**. Une zone couverte dont le code a bougé depuis (activité `git log` de date postérieure **ou égale** à la date de couverture — l'égalité compte comme stale) revient en pending au prochain `project` — du bruit a pu réapparaître. Justification de l'égalité et auto-correcteur : cf. `references/mode-project.md > C`. Sans cette comparaison, la couverture par chemin seul deviendrait faussement rassurante dans la durée.
+- `<validation>` = `tests OK` | `tests KO (<detail>)` | `degraded validation (<what ran>)`.
+- Zero stats are accepted (`0 deleted (already clean)`)—this is valid coverage recording that the zone was inspected.
+- **Coverage (`project` resume)**: `covered_zones` = paths from `project`/`zone` lines whose validation is **not** `tests KO`—a failed pass remains recorded (the line is still written) but does not count as coverage, so the zone returns to pending on resume. `degraded validation` counts as coverage (cleanup happened; the environment lacks tests). `session` lines do not count as zone coverage (see `references/mode-project.md > C`).
+- **Staleness**: the coverage date also supports **revalidation**. A covered zone whose code changed since then (`git log` activity dated later than **or equal to** its coverage date—equality counts as stale) returns to pending on the next `project`: noise may have reappeared. For the equality rationale and self-correction, see `references/mode-project.md > C`. Without this comparison, path-only coverage would become falsely reassuring over time.
 
-## Templates de sortie chat
+## Chat-output templates
 
-Suivre l'ossature à la lettre (le contenu des placeholders s'adapte). Conventions transverses (header, trailer, séparation récap/proposition) : cf. SKILL.md.
+Follow the structure exactly (placeholder content adapts). For cross-cutting conventions (header, trailer, summary/proposal separation), see SKILL.md.
 
-### `zone:selection` — Annonce de la zone auto (mode zone, sans arg)
-
-```
-Je propose : <zone> (<motif : jamais nettoyée | moins récemment nettoyée le YYYY-MM-DD>, <LoC>)
-Alternatives : <zone-alt-1> (<motif>) ou <zone-alt-2> (<motif>)
-```
-
-### `zone:summary` — Zone nettoyée
+### `zone:selection`—Auto-zone announcement (zone mode, no arg)
 
 ```
-Doc-cleanup terminé — <zone>
-
-<N> commentaires supprimés, <M> renames, <K> docs dé-driftées.
-Renames : <ancien → nouveau (S sites)>, … (ou « aucun »)
-Validation : <tests OK | tests KO : détail | dégradée>
-
-Files mis à jour : <STATE_DIR>/doccleanup_coverage.md (+1 ligne). Code nettoyé non commité — review via `git diff`.
+I propose: <zone> (<reason: never cleaned | least recently cleaned on YYYY-MM-DD>, <LoC>)
+Alternatives: <zone-alt-1> (<reason>) or <zone-alt-2> (<reason>)
 ```
 
-### `project:plan` — Plan de campagne (avant go-ahead)
+### `zone:summary`—Cleaned zone
 
 ```
-Campagne doc-cleanup — <projet>
+Doc-cleanup complete — <zone>
 
-Zones : <pending>/<Z> à traiter<, reprise : <C> déjà couvertes>.
-Validation : <commande détectée | à confirmer>.
-Mode : nettoyage agressif, sérialisé zone par zone. Rien ne sera commité (review sur le diff final).
+<N> comments deleted, <M> renames, <K> docs de-drifted.
+Renames: <old → new (S sites)>, … (or “none”)
+Validation: <tests OK | tests KO: detail | degraded>
 
-Je lance ? (go / ajuster la commande de validation / cibler une zone précise en mode zone)
+Files updated: <STATE_DIR>/doccleanup_coverage.md (+1 line). Cleaned code is uncommitted—review via `git diff`.
 ```
 
-### `project:zone-progress` — Avancement par zone (pendant la campagne)
+### `project:plan`—Campaign plan (before go-ahead)
 
 ```
-[<i>/<pending>] <zone> — <N> supprimés, <M> renames, <K> dé-driftées — <tests OK|KO>
+Doc-cleanup campaign — <project>
+
+Zones: <pending>/<Z> to process<, resuming: <C> already covered>.
+Validation: <detected command | to confirm>.
+Mode: aggressive cleanup, serialized zone by zone. Nothing will be committed (review the final diff).
+
+Launch? (go / adjust validation command / target a specific zone in zone mode)
 ```
 
-### `project:summary` — Fin de campagne
+### `project:zone-progress`—Per-zone progress (during campaign)
 
 ```
-Campagne doc-cleanup terminée — <projet>
-
-<Z-traitées> zones traitées<, <restantes> restantes (arrêt sur <raison>)>.
-Totaux : <ΣN> commentaires supprimés, <ΣM> renames, <ΣK> docs dé-driftées.
-
-Files mis à jour : <STATE_DIR>/doccleanup_coverage.md (+<Z-traitées> lignes). Tout est non commité — review via `git diff`, puis commit à ta main.
+[<i>/<pending>] <zone> — <N> deleted, <M> renames, <K> de-drifted — <tests OK|KO>
 ```
 
-### `session:summary` — Session nettoyée
+### `project:summary`—Campaign completion
 
 ```
-Doc-cleanup session terminé — <N> fichiers
+Doc-cleanup campaign complete — <project>
 
-<ΣN> commentaires supprimés, <ΣM> renames, <ΣK> docs dé-driftées.
-Renames : <ancien → nouveau (S sites)>, … (ou « aucun »)
-Validation : <tests OK | KO : détail | dégradée>
+<Z-processed> zones processed<, <remaining> remaining (stopped because <reason>)>.
+Totals: <ΣN> comments deleted, <ΣM> renames, <ΣK> docs de-drifted.
 
-Files mis à jour : <STATE_DIR>/doccleanup_coverage.md (+1 ligne). Code nettoyé non commité — review via `git diff`.
+Files updated: <STATE_DIR>/doccleanup_coverage.md (+<Z-processed> lines). Everything is uncommitted—review via `git diff`, then commit manually.
 ```
 
-### `session:none` — Rien à nettoyer
+### `session:summary`—Cleaned session
 
 ```
-Aucun fichier source modifié dans l'arbre de travail. Si ton travail de session est déjà commité, invoque `doc-cleanup` en mode zone avec un chemin explicite.
+Doc-cleanup session complete — <N> files
+
+<ΣN> comments deleted, <ΣM> renames, <ΣK> docs de-drifted.
+Renames: <old → new (S sites)>, … (or “none”)
+Validation: <tests OK | KO: detail | degraded>
+
+Files updated: <STATE_DIR>/doccleanup_coverage.md (+1 line). Cleaned code is uncommitted—review via `git diff`.
+```
+
+### `session:none`—Nothing to clean
+
+```
+No source files are modified in the worktree. If your session work is already committed, invoke `doc-cleanup` in zone mode with an explicit path.
 ```

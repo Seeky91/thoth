@@ -1,55 +1,55 @@
-# Mode : session (fichiers touchés)
+# Mode: session (touched files)
 
-Playbook chargé par SKILL.md en mode **session**, avec l'option éventuelle `--touched` ou `--files <path>...`. Nettoie les fichiers modifiés pendant la session courante, ou une liste explicite fournie par un orchestrateur. Charger `references/doctrine.md` avant d'exécuter. Conventions transverses : cf. SKILL.md.
+Playbook loaded by SKILL.md in **session** mode, with optional `--touched` or `--files <path>...`. Clean files modified during the current session, or an explicit list supplied by an orchestrator. Load `references/doctrine.md` before executing. For cross-cutting conventions, see SKILL.md.
 
-## A. Sélection des fichiers
+## A. File selection
 
-### Sélection par défaut
+### Default selection
 
-Signal déterministe = les fichiers **changés vs `HEAD`** dans la session (non encore commités), **staged ou non** :
+Deterministic signal = files **changed vs `HEAD`** in the session (not yet committed), **staged or not**:
 
-1. `git status --porcelain` → fichiers **modifiés**, **staged** et **non suivis** (untracked). C'est la source **autoritative** : elle voit l'index, contrairement à `git diff` seul (qui rate les changements staged-only).
-2. Filtrer sur les fichiers **source** (exclure générés/vendored, non-code, lockfiles, `.md`/`.json`/`.toml`).
-3. Set `fichiers_session` = le résultat.
+1. `git status --porcelain` → **modified**, **staged**, and **untracked** files. This is the **authoritative** source: it sees the index, unlike `git diff` alone (which misses staged-only changes).
+2. Filter to **source** files (exclude generated/vendored, non-code, lockfiles, `.md`/`.json`/`.toml`).
+3. Set `session_files` = result.
 
-**Fichiers staged / index** : si l'index n'est pas vide, l'**annoncer**. Le skill **ne modifie jamais l'index** (cf. git read-only) : éditer un fichier déjà staged ajoute des changements non-staged par-dessus (état mixte index/worktree — attendu et normal, l'utilisateur re-stagera à sa main). Les fichiers staged sont **inclus** dans le scope session : ils font partie du travail de la session.
+**Staged files/index**: if the index is nonempty, **announce it**. The skill **never modifies the index** (see read-only git): editing an already staged file adds unstaged changes on top (mixed index/worktree state—expected and normal; the user will restage manually). Staged files are **included** in session scope: they are part of the session's work.
 
-**Cas limites** :
-- **Aucun changement** (arbre propre) → `session:none` : *"Aucun fichier modifié dans l'arbre de travail. Si ton travail de session est déjà commité, invoque `doc-cleanup` en mode zone avec un chemin explicite."* Et terminer.
-- **Repo non-git** → pas de signal de session fiable : l'annoncer et suggérer le mode zone avec un chemin explicite.
-- Beaucoup de fichiers (≳ 8) ou très gros → **fan-out** sérialisé si les sous-agents sont disponibles et autorisés, sinon **main-loop segmentée** ; voir `references/orchestration.md`. Pour un petit scope, rester en main-loop.
+**Edge cases**:
+- **No changes** (clean worktree) → `session:none`: *"No files are modified in the worktree. If your session work is already committed, invoke `doc-cleanup` in zone mode with an explicit path."* Then stop.
+- **Non-git repo** → no reliable session signal: announce it and suggest zone mode with an explicit path.
+- Many files (≳ 8) or very large files → serialized **fan-out** if subagents are available and authorized; otherwise a **segmented main-loop**. See `references/orchestration.md`. Keep a small scope in the main-loop.
 
-### Sélection explicite (`--files`)
+### Explicit selection (`--files`)
 
-`--files <path>...` remplace entièrement la sélection par `git status`. Ce mode sert notamment à clore une campagne multi-cycle sans absorber le WIP préexistant :
+`--files <path>...` entirely replaces `git status` selection. This mode notably closes a multi-cycle campaign without absorbing preexisting WIP:
 
-1. Exiger au moins un path. Résoudre chaque path relativement au root projet, normaliser et dédupliquer en conservant l'ordre.
-2. Refuser tout path hors du root. Un path inexistant ou un dossier est invalide : demander une clarification plutôt que l'étendre implicitement.
-3. Filtrer sur les fichiers source avec les mêmes exclusions que le mode par défaut.
-4. Vérifier que chaque fichier retenu est encore modifié dans le worktree ; ignorer un fichier revenu identique à `HEAD` et l'annoncer.
-5. Set `fichiers_session` = cette liste filtrée. Ne jamais y ajouter d'autres fichiers depuis `git status`.
+1. Require at least one path. Resolve each path relative to the project root, normalize, and deduplicate while preserving order.
+2. Reject every path outside the root. A nonexistent path or directory is invalid: ask for clarification rather than implicitly expanding it.
+3. Filter to source files using the same exclusions as default mode.
+4. Verify that each retained file is still modified in the worktree; ignore and announce any file now identical to `HEAD`.
+5. Set `session_files` = this filtered list. Never add other files from `git status`.
 
-`--files` et `--touched` sont incompatibles : refuser la combinaison. Si aucun fichier ne reste après filtrage, utiliser `session:none` avec une formulation adaptée à la liste explicite et ne pas écrire de couverture.
+`--files` and `--touched` are incompatible: reject the combination. If no files remain after filtering, use `session:none` with wording adapted to the explicit list and write no coverage.
 
-## B. Scope : fichier entier vs hunks
+## B. Scope: whole file vs hunks
 
-- **Défaut et `--files`** : nettoyer le **fichier entier** de chaque fichier touché. Justification : un commentaire inutile 5 lignes au-dessus d'une ligne modifiée reste inutile, et un rename est non-local par nature. Le fichier touché est la *sélection* ; le fichier entier est l'*unité de travail*.
-- **`--touched`** : restreindre aux **hunks modifiés**, récupérés via `git diff HEAD` (inclut staged **et** non-staged ; **pas** `git diff` seul qui rate les hunks staged). Opt-in étroit. **Fichiers non suivis (untracked)** : `git diff HEAD` ne produit **aucun hunk** pour eux (pas de version de base à differ) — il n'y a rien à restreindre, donc un fichier untracked est traité **en entier** même sous `--touched`, en l'annonçant dans la sortie (le flag ne l'a pas borné, c'est attendu : un fichier neuf est intégralement « touché »). **Avertir** que ce scope est partiel : un rename dont des références sortent des hunks doit quand même propager dans tout le projet (la doctrine de rename prime sur la restriction de scope), et du bruit hors-hunk sera laissé.
+- **Default and `--files`**: clean the **entire file** for each touched file. Rationale: a useless comment 5 lines above a modified line remains useless, and a rename is inherently non-local. The touched file is the *selection*; the whole file is the *work unit*.
+- **`--touched`**: restrict to **modified hunks**, obtained via `git diff HEAD` (includes staged **and** unstaged; **not** `git diff` alone, which misses staged hunks). Narrow opt-in. **Untracked files**: `git diff HEAD` produces **no hunks** for them (no base version to diff)—there is nothing to restrict, so process an untracked file **in full** even with `--touched`, and announce this in output (the flag did not bound it; expected because a new file is entirely “touched”). **Warn** that this scope is partial: a rename with references outside hunks must still propagate across the entire project (rename doctrine overrides the scope restriction), and out-of-hunk noise will remain.
 
-## C. Exécution
+## C. Execution
 
-Appliquer la doctrine (cf. `references/doctrine.md`) sur le scope retenu : SUPPRIMER le bruit, RENOMMER pour supprimer (grep des références dans tout le projet avant chaque rename), GARDER + dé-drifter. En `--touched`, ne pas sortir des hunks **sauf** pour propager un rename.
+Apply the doctrine (see `references/doctrine.md`) to the retained scope: DELETE noise, RENAME to delete (grep references across the entire project before each rename), KEEP + de-drift. With `--touched`, do not leave the hunks **except** to propagate a rename.
 
-## D. Validation + sortie
+## D. Validation + output
 
-1. **Valider** une fois tous les fichiers traités (cf. `references/orchestration.md > Validation`). KO → reporter, arbitrage utilisateur.
-2. **Ligne de couverture** (delta, en tête de `<STATE_DIR>/doccleanup_coverage.md`) : mode `session`, scope = `session (<N> files)`, `session --touched (<N> files)` ou `session --files (<N> files)`. Cf. `references/file-formats.md`.
-3. **Sortie** via `session:summary` : fichiers traités, commentaires supprimés, renames, docs dé-driftées, validation, rappel non commité.
+1. **Validate** after all files are processed (see `references/orchestration.md > Validation`). KO → report and let the user arbitrate.
+2. **Coverage line** (delta, at the top of `<STATE_DIR>/doccleanup_coverage.md`): mode `session`, scope = `session (<N> files)`, `session --touched (<N> files)`, or `session --files (<N> files)`. See `references/file-formats.md`.
+3. **Output** via `session:summary`: files processed, comments deleted, renames, docs de-drifted, validation, uncommitted reminder.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-- Ligne de couverture écrite (mode `session`).
-- Validation lancée et reportée (ou dégradation annoncée).
-- Renames listés ; en `--touched`, avertissement de scope partiel émis ; en `--files`, aucun fichier hors liste nettoyé de manière opportuniste (seuls les sites de propagation d'un rename déclaré peuvent être modifiés hors liste).
-- Aucun `git add`/`commit`.
-- Aucun fichier touché → `session:none`, pas de nettoyage forcé.
+- Coverage line written (`session` mode).
+- Validation run and reported (or degradation announced).
+- Renames listed; with `--touched`, partial-scope warning emitted; with `--files`, no out-of-list file opportunistically cleaned (only propagation sites of a declared rename may be modified outside the list).
+- No `git add`/`commit`.
+- No touched files → `session:none`; no forced cleanup.

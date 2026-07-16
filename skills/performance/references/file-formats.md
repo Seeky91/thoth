@@ -1,36 +1,36 @@
-# Format des fichiers projet
+# Project file formats
 
-Référence normative pour l'état performance sous `<STATE_DIR>`. Conserver le Markdown : lisible, diffable et éditable à la main. Relire chaque fichier juste avant écriture et appliquer uniquement le delta ciblé.
+Normative reference for performance state under `<STATE_DIR>`. Keep Markdown readable, diffable, and manually editable. Reread each file immediately before writing and apply only the targeted delta.
 
 ## `performance_history.md`
 
-Journal append-only, nouvelle ligne préfixée en tête :
+Append-only log, with each new line prepended:
 
 ```markdown
 <!-- rolling_size: 4 -->
 # Performance audit history
 
 - 2026-07-15 — feature:checkout [src/checkout, src/db/orders] — 2 findings (1 HIGH, 1 MED) (pending) — metric: p95 latency — workload: `make bench-checkout`
-- 2026-07-10 — src/serializer/ — 0 findings (clean — throughput dans le budget, hypothèse re-parse par appel réfutée) — metric: throughput — workload: `cargo bench serializer`
-- 2026-07-08 — src/db/migrations/ — skipped (exposure-capped: 1×/déploiement × ~10 ms plausibles majorés)
-- 2026-07-02 — feature:search [src/search] — 0 findings (inconclusive: variance instable) — workload: `pytest tests/test_search.py`
+- 2026-07-10 — src/serializer/ — 0 findings (clean — throughput within budget, per-call reparsing hypothesis refuted) — metric: throughput — workload: `cargo bench serializer`
+- 2026-07-08 — src/db/migrations/ — skipped (exposure-capped: 1×/deployment × ~10 plausible upper-bounded ms)
+- 2026-07-02 — feature:search [src/search] — 0 findings (inconclusive: unstable variance) — workload: `pytest tests/test_search.py`
 ```
 
-Règles :
+Rules:
 
-- Format : `- YYYY-MM-DD — <scope> — <résultat> — metric: <métrique> — workload: <commande sanitisée>`. Une ligne `skipped` n'a ni metric ni workload (aucune mesure) : `- YYYY-MM-DD — <scope> — skipped (exposure-capped: <calcul court>)`.
-- `<scope>` = path ou `feature:<description-courte> [paths principaux]`.
-- L'identité d'une scope `feature:` est portée par les paths entre crochets, pas par le texte libre : deux lignes dont les paths se recouvrent matériellement désignent la même scope même si la description diffère. Avant d'écrire une nouvelle ligne feature, réutiliser la description exacte d'une ligne existante qui matche par les paths.
-- Résultat = `N findings (...) (pending|résolus ...)`, `0 findings (clean[ — <justification>])`, `0 findings (inconclusive: <raison>)` ou `skipped (exposure-capped: <calcul>)`.
-- La parenthèse de résultat tient en **une phrase courte**. Le détail d'un finding vit dans `performance_findings.md` ; une ligne `clean` porte au plus la métrique dominante, la raison d'immatérialité et les hypothèses réfutées.
-- Une ligne `skipped` n'est pas un audit : la scope ne compte ni dans le rolling ni comme couverte par une mesure. Elle bloque la re-proposition auto du scope tant que ni son code ni son exposition n'ont changé ; ne pas la dupliquer si le calcul est inchangé.
-- Une même scope peut apparaître plusieurs fois ; retrouver l'audit d'origine par la paire exacte date + scope.
-- L'historique n'est jamais trimmé. Le rolling est une vue sur les 4 premières scopes **auditées** (lignes `skipped` ignorées), override possible avec `<!-- rolling_size: N -->`.
-- Une ligne inconclusive mémorise la tentative mais ne prouve pas que la scope est propre.
+- Format: `- YYYY-MM-DD — <scope> — <result> — metric: <metric> — workload: <sanitized command>`. A `skipped` line has neither metric nor workload (no measurement): `- YYYY-MM-DD — <scope> — skipped (exposure-capped: <short calculation>)`.
+- `<scope>` = path or `feature:<short-description> [main paths]`.
+- A `feature:` scope's identity is carried by the bracketed paths, not the free text: two lines whose paths materially overlap designate the same scope even if their descriptions differ. Before writing a new feature line, reuse the exact description of an existing line that matches by paths.
+- Result = `N findings (...) (pending|resolved ...)`, `0 findings (clean[ — <justification>])`, `0 findings (inconclusive: <reason>)`, or `skipped (exposure-capped: <calculation>)`.
+- The result parenthetical must be **one short sentence**. Finding details live in `performance_findings.md`; a `clean` line contains at most the dominant metric, reason for immateriality, and refuted hypotheses.
+- A `skipped` line is not an audit: the scope counts neither in the rolling window nor as covered by measurement. It blocks automatic reproposal of the scope until its code or exposure changes; do not duplicate it if the calculation is unchanged.
+- The same scope may appear multiple times; locate the original audit by the exact date + scope pair.
+- History is never trimmed. The rolling window is a view over the first 4 **audited** scopes (`skipped` lines ignored), with optional override `<!-- rolling_size: N -->`.
+- An inconclusive line records the attempt but does not prove the scope is clean.
 
 ## `performance_findings.md`
 
-Source de vérité :
+Source of truth:
 
 ```markdown
 # Performance findings
@@ -40,82 +40,82 @@ Source de vérité :
 ## Pending
 
 ### PERF-007 — HIGH — src/checkout/reprice.ts:88
-- **Axe :** latence / I/O
-- **Scope :** feature:checkout [src/checkout, src/db/orders]
-- **Workload :** `make bench-checkout CASE=standard` ; 200 commandes synthétiques, warmup 3, 15 répétitions, build production
-- **Métrique :** latence p95
-- **Baseline :** 428 ms p95 ; médiane 391 ms ; dispersion p95 18 ms ; Linux x86_64, Node 24, build production
-- **Observation :** 201 lectures séquentielles sont exécutées pour 200 commandes.
-- **Preuve :** trace DB : 76 % du temps dans `loadPrice`, appelée une fois par commande depuis l. 88.
-- **Hypothèse :** charger les prix distincts en une requête batch supprimera les round-trips séquentiels.
-- **Reco :** précharger les IDs distincts puis résoudre les commandes depuis une map locale.
-- **Acceptation :** p95 sous le budget existant de 250 ms, mêmes résultats fonctionnels et aucune hausse mémoire > budget projet.
-- **Maintenabilité :** conserver le batching dans le repository ; ne pas exposer la map aux couches appelantes.
-- **Détecté :** 2026-07-15 (feature:checkout [src/checkout, src/db/orders])
-- **Status :** pending
-- **Double-check (2026-07-16) :** reproduction 421 ms p95 (écart baseline 1,6 %) ; profil confirmé ; blast radius 3 call sites/8 tests ; effort M ; verdict GO ; plan affiné : `loadPrices(ids)` dans le repository ; gain attendu : suppression de 200 round-trips.
+- **Axis:** latency / I/O
+- **Scope:** feature:checkout [src/checkout, src/db/orders]
+- **Workload:** `make bench-checkout CASE=standard`; 200 synthetic orders, warmup 3, 15 repetitions, production build
+- **Metric:** p95 latency
+- **Baseline:** 428 ms p95; median 391 ms; p95 dispersion 18 ms; Linux x86_64, Node 24, production build
+- **Observation:** 201 sequential reads are executed for 200 orders.
+- **Evidence:** DB trace: 76% of time in `loadPrice`, called once per order from line 88.
+- **Hypothesis:** loading distinct prices in one batch query will eliminate sequential round trips.
+- **Recommendation:** preload distinct IDs, then resolve orders from a local map.
+- **Acceptance:** p95 below the existing 250 ms budget, identical functional results, and no memory increase above the project budget.
+- **Maintainability:** keep batching in the repository; do not expose the map to calling layers.
+- **Detected:** 2026-07-15 (feature:checkout [src/checkout, src/db/orders])
+- **Status:** pending
+- **Double-check (2026-07-16):** reproduction 421 ms p95 (1.6% baseline delta); profile confirmed; blast radius 3 call sites/8 tests; effort M; verdict GO; refined plan: `loadPrices(ids)` in the repository; expected gain: eliminate 200 round trips.
 
 ## Resolved
 
-### PERF-003 — MED — src/serializer.rs:44 (résolu 2026-07-12)
-- **Axe :** CPU / allocations
-- **Resolution :** buffer réutilisé dans la boucle chaude. Commit : non commité.
-- **Validation :** avant 82k ops/s, après 119k ops/s (+45 %) ; dispersion 2,8 % ; tests ciblés et suite projet OK ; garde-fou maintenabilité OK.
-- **Audit origin :** 2026-07-10 (src/serializer/)
+### PERF-003 — MED — src/serializer.rs:44 (resolved 2026-07-12)
+- **Axis:** CPU / allocations
+- **Resolution:** buffer reused in the hot loop. Commit: uncommitted.
+- **Validation:** before 82k ops/s, after 119k ops/s (+45%); dispersion 2.8%; targeted tests and project suite OK; maintainability guardrail OK.
+- **Audit origin:** 2026-07-10 (src/serializer/)
 ```
 
-### Format Pending
+### Pending format
 
-Ordre strict : Axe, Scope, Workload, Métrique, Baseline, Observation, Preuve, Hypothèse, Reco, Acceptation, Maintenabilité, Détecté, Status, puis sections optionnelles `Dernière observation` et `Double-check`.
+Strict order: Axis, Scope, Workload, Metric, Baseline, Observation, Evidence, Hypothesis, Recommendation, Acceptance, Maintainability, Detected, Status, then optional `Latest observation` and `Double-check` sections.
 
-Status autorisés :
+Allowed statuses:
 
-- `pending` ;
-- `stale (YYYY-MM-DD) — workload non reproductible : <raison>` ;
-- `stale (YYYY-MM-DD) — scope introuvable : <raison>` ;
-- `blocked (YYYY-MM-DD) — mesure sûre impossible sans <condition>` uniquement si une dépendance externe précise empêche toute re-mesure.
+- `pending`;
+- `stale (YYYY-MM-DD) — workload not reproducible: <reason>`;
+- `stale (YYYY-MM-DD) — scope not found: <reason>`;
+- `blocked (YYYY-MM-DD) — safe measurement impossible without <condition>` only if a specific external dependency prevents all remeasurement.
 
-L'ID est immuable. Sévérité, localisation, workload et acceptation peuvent être amendés après double-check avec trace dans la section correspondante.
+The ID is immutable. Severity, location, workload, and acceptance may be amended after double-check with a trace in the corresponding section.
 
-### Format Resolved compact
+### Compact Resolved format
 
-Conserver exactement quatre bullets : Axe, Resolution, Validation, Audit origin. `Resolution` décrit le fix et indique `Commit : <hash>` ou `Commit : non commité`. `Validation` contient mesure avant/après, gain absolu/relatif pertinent, dispersion, tests et verdict du garde-fou de maintenabilité.
+Keep exactly four bullets: Axis, Resolution, Validation, Audit origin. `Resolution` describes the fix and states `Commit: <hash>` or `Commit: uncommitted`. `Validation` contains before/after measurements, relevant absolute/relative gain, dispersion, tests, and the maintainability guardrail verdict.
 
-Cap `## Resolved` = 8 entrées. Déplacer les plus anciennes vers l'archive après chaque résolution.
+Cap `## Resolved` = 8 entries. Move the oldest to the archive after every resolution.
 
 ## `performance_resolved_archive.md`
 
-Créer paresseusement :
+Create lazily:
 
 ```markdown
 # Performance resolved archive
 
-### PERF-001 — MED — src/cache.ts:19 (résolu 2026-06-01)
-- **Axe :** latence
-- **Resolution :** ...
-- **Validation :** ...
-- **Audit origin :** ...
+### PERF-001 — MED — src/cache.ts:19 (resolved 2026-06-01)
+- **Axis:** latency
+- **Resolution:** ...
+- **Validation:** ...
+- **Audit origin:** ...
 ```
 
-Ne pas ajouter de sections Pending/Resolved. Déplacer les entrées compactes intactes en fin de fichier. Ne lire l'archive que pour recompute du compteur, update ou demande explicite.
+Do not add Pending/Resolved sections. Move intact compact entries to the end of the file. Read the archive only to recompute the counter, update, or fulfill an explicit request.
 
-## Compteur d'IDs
+## ID counter
 
-Utiliser `<!-- id_counter: PERF=N -->` dans `performance_findings.md`.
+Use `<!-- id_counter: PERF=N -->` in `performance_findings.md`.
 
-- Avant assignation, calculer `max(valeur_header, plus grand PERF-NNN présent dans findings)`, puis incrémenter.
-- Header absent : scanner findings et archive, calculer le max, puis écrire le header.
-- À chaque update : re-scanner findings + archive et corriger le header.
-- Ne jamais réutiliser un ID supprimé ou archivé.
-- Format minimal à trois chiffres : `PERF-001`.
+- Before assignment, compute `max(header_value, largest PERF-NNN present in findings)`, then increment.
+- If the header is absent, scan findings and archive, compute the max, then write the header.
+- On every update, rescan findings + archive and correct the header.
+- Never reuse a deleted or archived ID.
+- Minimum three-digit format: `PERF-001`.
 
-## Cycle de vie
+## Lifecycle
 
-1. **Audit** : créer un Pending uniquement avec preuve mesurée.
-2. **Double-check** : reproduire, approfondir et ajouter une section datée ; verdict GO, GO-mais-après-X, NO-GO ou INCONCLUSIF.
-3. **Fix confirmé** : modifier le code, exécuter tests et benchmark comparable, puis contrôler le diff avec le garde-fou de maintenabilité.
-4. **Résolution** : seulement si acceptation satisfaite, correction préservée et gain au-delà de la variance. Déplacer vers Resolved compact et compléter history.
-5. **Update** : re-mesurer les pendings ; résoudre ceux qui satisfont désormais l'acceptation dans un environnement comparable, maintenir les présents, tagger les stales.
-6. **Archivage** : si Resolved > 8, déplacer les plus anciennes vers l'archive ; tie-break par ordre du fichier.
+1. **Audit:** create a Pending entry only with measured evidence.
+2. **Double-check:** reproduce, investigate, and add a dated section; verdict GO, GO-but-after-X, NO-GO, or INCONCLUSIVE.
+3. **Confirmed fix:** modify code, run tests and a comparable benchmark, then inspect the diff with the maintainability guardrail.
+4. **Resolution:** only if acceptance is satisfied, correctness preserved, and gain exceeds variance. Move to compact Resolved format and complete history.
+5. **Update:** remeasure pending findings; resolve those now satisfying acceptance in a comparable environment, retain those still present, tag stale ones.
+6. **Archival:** if Resolved > 8, move the oldest to the archive; break ties by file order.
 
-Un fix sans amélioration mesurable ou avec tests KO reste Pending. Ne jamais marquer résolu parce que le code « semble plus rapide ».
+A fix without measurable improvement or with failing tests remains Pending. Never mark resolved because the code "looks faster."

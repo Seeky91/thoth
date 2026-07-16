@@ -1,77 +1,77 @@
-# Mode : update
+# Mode: update
 
-Référence chargée en mode **update**. Lire `references/doctrine.md` et `references/file-formats.md`. Re-mesurer les findings existants ; ne pas chercher de nouveaux bottlenecks.
+Reference loaded in **update** mode. Read `references/doctrine.md` and `references/file-formats.md`. Remeasure existing findings; do not search for new bottlenecks.
 
-## Préparer l'update
+## Prepare the update
 
-1. Lire tous les Pending de `performance_findings.md`.
-2. Extraire pour chacun scope, workload, métrique, baseline, acceptation, environnement et dernière observation.
-3. Construire un plan de commandes, coûts et dépendances. L'invocation autorise les workloads locaux courts déjà enregistrés ; demander confirmation avant toute charge longue, distante, facturable ou potentiellement destructive.
-4. Si plusieurs findings partagent exactement workload et protocole, mesurer une fois et réutiliser la même observation avec attribution propre à chaque finding.
+1. Read every Pending entry in `performance_findings.md`.
+2. Extract each scope, workload, metric, baseline, acceptance criterion, environment, and latest observation.
+3. Build a plan of commands, costs, and dependencies. Invocation authorizes short, already recorded local workloads; request confirmation before any long, remote, billable, or potentially destructive load.
+4. If multiple findings share exactly the same workload and protocol, measure once and reuse the same observation with attribution specific to each finding.
 
-## Re-vérifier chaque finding
+## Recheck each finding
 
 ### 1. Scope
 
-- Path présent : continuer.
-- Path absent : rechercher rename ou déplacement via git et recherche de symboles.
-  - signal unique/fort : proposer la relocalisation puis continuer si validée ;
-  - coût clairement supprimé avec commit identifiable : continuer vers une re-mesure du workload avant toute résolution ;
-  - signal ambigu : `Status: stale (date) — scope introuvable : <raison>`.
+- Path present: continue.
+- Path absent: search for a rename or move via Git and symbol search.
+  - unique/strong signal: propose relocation, then continue if validated;
+  - cost clearly removed with an identifiable commit: proceed to workload remeasurement before any resolution;
+  - ambiguous signal: `Status: stale (date) — scope not found: <reason>`.
 
 ### 2. Workload
 
-- Commande et fixtures disponibles : continuer.
-- Commande renommée avec remplacement évident dans le même manifeste/historique : proposer l'amendement avant exécution.
-- Dépendance locale temporairement indisponible : `blocked (date) — mesure sûre impossible sans <condition>`.
-- Workload disparu ou non reproductible : `stale (date) — workload non reproductible : <raison>`.
-- Ne jamais substituer silencieusement un autre workload : il changerait le sens de la baseline.
+- Command and fixtures available: continue.
+- Command renamed with an obvious replacement in the same manifest/history: propose the amendment before execution.
+- Local dependency temporarily unavailable: `blocked (date) — safe measurement impossible without <condition>`.
+- Workload gone or non-reproducible: `stale (date) — workload not reproducible: <reason>`.
+- Never silently substitute another workload: it would change the meaning of the baseline.
 
-### 3. Comparabilité
+### 3. Comparability
 
-Comparer build mode, taille d'entrée, concurrence, runtime/toolchain et environnement. Un drift mineur documenté peut rester comparable ; un drift susceptible d'expliquer l'écart impose une nouvelle série de référence. Dans ce dernier cas :
+Compare build mode, input size, concurrency, runtime/toolchain, and environment. A documented minor drift may remain comparable; drift that could explain the difference requires a new reference series. In the latter case:
 
-- écrire `Dernière observation (date)` comme nouvelle mesure non comparable ;
-- laisser Pending ;
-- proposer de rebaseliner explicitement plutôt que conclure résolu/régressé.
+- write `Latest observation (date)` as a new non-comparable measurement;
+- leave Pending;
+- propose explicit re-baselining instead of concluding resolved/regressed.
 
-### 4. Mesure
+### 4. Measurement
 
-1. Lancer le test de correction ciblé.
-2. Rejouer warmup et protocole enregistrés.
-3. Calculer la métrique et la dispersion avec la même méthode.
-4. Comparer à baseline et acceptation :
-   - acceptation satisfaite, environnement comparable, correction OK, écart au-delà du bruit → résoudre ;
-   - bottleneck toujours présent → laisser Pending et ajouter `Dernière observation (date)` ;
-   - résultat significativement pire → laisser Pending, ajouter l'observation et signaler la régression ;
-   - variance empêche de conclure → laisser Pending et noter `inconclusif` dans la dernière observation.
+1. Run the targeted correctness test.
+2. Replay the recorded warmup and protocol.
+3. Calculate the metric and dispersion with the same method.
+4. Compare against baseline and acceptance criterion:
+   - acceptance satisfied, comparable environment, correctness OK, difference beyond noise → resolve;
+   - bottleneck still present → leave Pending and add `Latest observation (date)`;
+   - significantly worse result → leave Pending, add the observation, and report the regression;
+   - variance prevents a conclusion → leave Pending and note `inconclusive` in the latest observation.
 
-Ne pas marquer résolu à partir d'un changement statique seul.
+Do not mark resolved based on a static change alone.
 
-## Écritures de résolution
+## Resolution writes
 
-Pour chaque résolu :
+For each resolved finding:
 
-1. Déplacer vers `## Resolved` au format compact.
-2. Ajouter `(résolu YYYY-MM-DD)` au titre.
-3. Renseigner mesure avant/après, gain, dispersion, tests et garde-fou maintenabilité dans `Validation`.
-4. Identifier le commit responsable seulement sans ambiguïté ; sinon `Commit : non commité` ou `Commit : indéterminé` pour un changement externe.
-5. Compléter la ligne history d'origine `(résolus <IDs>)` via date + scope.
-6. Appliquer le cap Resolved = 8.
+1. Move it to `## Resolved` in compact format.
+2. Add `(resolved YYYY-MM-DD)` to the title.
+3. Record before/after measurements, gain, dispersion, tests, and maintainability guardrail in `Validation`.
+4. Identify the responsible commit only without ambiguity; otherwise use `Commit: uncommitted` or `Commit: indeterminate` for an external change.
+5. Complete the original history line with `(resolved <IDs>)` via date + scope.
+6. Apply the Resolved cap = 8.
 
-Recalculer ensuite le compteur `PERF` depuis findings + archive. Backfiller un `Commit : non commité` uniquement lorsqu'un commit correspondant est identifiable sans ambiguïté.
+Then recompute the `PERF` counter from findings + archive. Backfill a `Commit: uncommitted` only when a corresponding commit is identifiable without ambiguity.
 
-## Sortie
+## Output
 
-Utiliser `update:summary`. Signaler séparément résolus, toujours présents, régressés, non comparables, relocalisés, stale et blocked.
+Use `update:summary`. Report resolved, still present, regressed, non-comparable, relocated, stale, and blocked separately.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-- Chaque Pending sûr et exécutable re-mesuré avec son workload enregistré.
-- Toute commande non sûre ou coûteuse confirmée avant exécution.
-- Aucun workload substitué silencieusement.
-- Résolution fondée sur mesure comparable + correction OK.
-- Dernières observations écrites en delta pour les findings maintenus.
-- Résolus compactés, history complétée, cap appliqué.
-- Compteur `PERF` recalculé.
-- État partiel et commandes non exécutées annoncés.
+- Every safe and executable Pending finding remeasured with its recorded workload.
+- Every unsafe or costly command confirmed before execution.
+- No silently substituted workload.
+- Resolution based on comparable measurement + correctness OK.
+- Latest observations written as deltas for retained findings.
+- Resolved findings compacted, history completed, cap applied.
+- `PERF` counter recomputed.
+- Partial state and unexecuted commands announced.

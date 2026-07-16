@@ -6,182 +6,182 @@ description: "Orchestrate one or more autonomous, goal-backed performance cycles
 
 # Performance cycle
 
-Orchestrer une campagne autonome au-dessus des skills `performance` et `doc-cleanup`. Ne redéfinir ni leur doctrine ni leurs formats : charger leurs instructions, enchaîner leurs modes et préserver tous leurs invariants de preuve.
+Orchestrate an autonomous campaign on top of the `performance` and `doc-cleanup` skills. Do not redefine their doctrine or formats: load their instructions, chain their modes, and preserve all their evidence invariants.
 
-## Dépendances
+## Dependencies
 
-Avant d'agir :
+Before acting:
 
-1. Charger le skill `performance` et les références requises pour chaque opération atomique.
-2. Charger `doc-cleanup` uniquement au moment de la clôture, sauf si `--no-doc-cleanup` est présent.
-3. Si le runtime ne sait pas activer un skill par son nom, résoudre les skills frères `../performance/SKILL.md` et `../doc-cleanup/SKILL.md` depuis ce dossier.
+1. Load the `performance` skill and the references required for each atomic operation.
+2. Load `doc-cleanup` only during closeout, unless `--no-doc-cleanup` is present.
+3. If the runtime cannot activate a skill by name, resolve the sibling skills `../performance/SKILL.md` and `../doc-cleanup/SKILL.md` from this directory.
 
-Le skill atomique reste autoritatif sur le root, les workloads, la comparabilité, les formats d'état, les tests, les dates et les critères de résolution. En cas de contradiction, le présent skill ne remplace que les gates interactives explicitement levées ci-dessous ; toutes les exigences de preuve et de sûreté restent applicables.
+The atomic skill remains authoritative for the root, workloads, comparability, state formats, tests, dates, and resolution criteria. If instructions conflict, this skill overrides only the interactive gates explicitly lifted below; all evidence and safety requirements still apply.
 
-## Entrée
+## Input
 
-- `<N>` : nombre de cycles visé, entier strictement positif ; défaut `1`.
-- `--no-doc-cleanup` : désactiver la clôture documentaire.
-- Un argument inconnu ou un entier invalide exige une clarification. Ne pas deviner.
+- `<N>`: target number of cycles, a strictly positive integer; default `1`.
+- `--no-doc-cleanup`: disable documentation closeout.
+- An unknown argument or invalid integer requires clarification. Do not guess.
 
-Accepter les formulations équivalentes indépendamment du runtime, par exemple `/performance-cycle 3` avec Claude Code ou `$performance-cycle lance 3 cycles` avec Codex.
+Accept equivalent phrasing regardless of runtime, for example `/performance-cycle 3` with Claude Code or `$performance-cycle run 3 cycles` with Codex.
 
-## Goal natif
+## Native goal
 
-L'invocation explicite demande et autorise un **goal natif unique** couvrant au maximum `<N>` cycles, avec arrêt anticipé si aucun finding mesurable et actionnable ne subsiste, puis la clôture doc-cleanup éventuelle.
+Explicit invocation requests and authorizes a **single native goal** covering at most `<N>` cycles, with an early stop when no measurable, actionable finding remains, followed by optional doc-cleanup closeout.
 
-- Réutiliser un goal actif qui couvre déjà la demande ; ne pas en imbriquer un second.
-- Créer le goal avant le travail si le runtime expose ce mécanisme. Ne fixer un budget que si l'utilisateur en fournit un.
-- Sans goal persistant, exécuter la même boucle dans le thread courant.
-- Ne terminer le goal qu'après validation, écritures d'état, invariants de campagne et clôture doc-cleanup demandée. Un audit mesuré clean ou l'absence de GO n'est pas un blocage.
-- Sur un arrêt réellement bloquant, laisser le goal actif ou appliquer la politique native du runtime ; ne jamais le déclarer terminé artificiellement.
+- Reuse an active goal that already covers the request; do not nest a second one.
+- Create the goal before work if the runtime exposes this mechanism. Set a budget only if the user provides one.
+- Without persistent goals, run the same loop in the current thread.
+- Complete the goal only after validation, state writes, campaign invariants, and the requested doc-cleanup closeout. A measured clean audit or absence of GO findings is not a blocker.
+- On a genuinely blocking stop, leave the goal active or apply the runtime's native policy; never declare it artificially complete.
 
-## Autorisation autonome bornée
+## Bounded autonomous authorization
 
-L'invocation vaut confirmation en amont pour :
+Invocation counts as advance confirmation to:
 
-- sélectionner une cible et un workload **local, sûr, court et non ambigu** selon le classement de `performance` ;
-- consigner les lignes `skipped (exposure-capped)` produites par le triage de matérialité ;
-- exécuter l'audit, choisir un finding Pending, le double-checker et rejouer sa baseline ;
-- appliquer un fix borné après verdict `GO` ;
-- persister directement la résolution lorsque tests, acceptation, gain hors variance et garde-fou de maintenabilité sont tous satisfaits ;
-- archiver un `NO-GO` — hypothèse réfutée, coût non actionnable ou compromis injustifié — sans scénario crédible de réévaluation.
+- select a **local, safe, short, and unambiguous** target and workload according to the `performance` ranking;
+- record `skipped (exposure-capped)` lines produced by materiality triage;
+- run the audit, choose a Pending finding, double-check it, and replay its baseline;
+- apply a bounded fix after a `GO` verdict;
+- directly persist resolution when tests, acceptance, gain outside variance, and the maintainability guardrail are all satisfied;
+- archive a `NO-GO`—refuted hypothesis, non-actionable cost, or unjustified tradeoff—with no credible reevaluation scenario.
 
-Dans ce cadre seulement, les propositions de sélection, de fix et de résolution du skill atomique deviennent des annonces d'avancement. Continuer sans demander de nouvel accord tant que l'action reste dans ce périmètre.
+Only within this framework do the atomic skill's selection, fix, and resolution proposals become progress announcements. Continue without requesting new approval while the action remains within this scope.
 
-Cette autorisation ne couvre jamais :
+This authorization never covers:
 
-- un workload de production, distant, facturable, destructif, fondé sur des données réelles ou susceptible de générer une charge externe ;
-- une commande anormalement longue ou lourde, l'installation d'une dépendance, un changement de configuration système ou une exigence métier/SLO inventée ;
-- `git add`, `commit`, `push`, une opération destructive ou un autre domaine d'audit ;
-- un scope ou workload ambigu dont le choix pourrait changer la conclusion.
+- a production, remote, billable, destructive, real-data-based workload, or one liable to generate external load;
+- an abnormally long or heavy command, dependency installation, system configuration change, or invented business/SLO requirement;
+- `git add`, `commit`, `push`, a destructive operation, or another audit domain;
+- an ambiguous scope or workload whose selection could change the conclusion.
 
-Demander une autorisation ciblée dans ces cas, ou lorsqu'un fix exige de chevaucher un WIP protégé.
+Request targeted authorization in these cases, or when a fix requires overlapping protected WIP.
 
-## État initial de campagne
+## Initial campaign state
 
-1. Résoudre le root via `performance` et lire le contexte durable du projet (`AGENTS.md`, `CLAUDE.md`, état `.code-quality`, commandes de benchmark et conventions de validation).
-2. Si `<STATE_DIR>/performance_campaign.md` existe : annoncer une campagne interrompue et reprendre son état si la demande courante la continue ; sinon demander avant de l'écraser. Ne jamais recapturer sa baseline sale.
-3. Capturer `baseline_dirty_source_files` depuis `git status --porcelain=v1 -z`. Protéger ces fichiers : choisir un autre finding ou demander une autorisation ciblée avant tout chevauchement.
-4. Lire le board et l'historique performance avant la première sélection.
-5. Suivre en mémoire : compteur, scope ou ID courant, phase, `campaign_touched_source_files` (fichiers source réellement édités par les fixes) et IDs non actionnables pendant la campagne.
+1. Resolve the root through `performance` and read persistent project context (`AGENTS.md`, `CLAUDE.md`, `.code-quality` state, benchmark commands, and validation conventions).
+2. If `<STATE_DIR>/performance_campaign.md` exists, announce an interrupted campaign and resume its state if the current request continues it; otherwise ask before overwriting it. Never recapture its dirty baseline.
+3. Capture `baseline_dirty_source_files` from `git status --porcelain=v1 -z`. Protect these files: choose another finding or request targeted authorization before any overlap.
+4. Read the performance board and history before the first selection.
+5. Track in memory: counter, current scope or ID, phase, `campaign_touched_source_files` (source files actually edited by fixes), and IDs non-actionable during the campaign.
 
-### Fichier de campagne
+### Campaign file
 
-`<STATE_DIR>/performance_campaign.md` persiste uniquement l'état d'orchestration absent du ledger.
+`<STATE_DIR>/performance_campaign.md` persists only orchestration state absent from the ledger.
 
-- Pour `<N> > 1`, le créer au démarrage.
-- Pour un cycle unique, le créer seulement si le scope le justifie : workload long, nombreux artefacts ou phases, usage de sous-agents, ou risque concret d'interruption. La boucle courte normale n'en crée pas.
-- Si un cycle unique sans fichier devient bloqué après une mutation, créer le fichier avant de rendre la main afin de préserver la reprise.
-- Ne pas dupliquer les workloads, baselines, double-checks ou preuves déjà stockés dans `performance_findings.md`.
-- Ce fichier d'état n'est pas un fichier source : il n'entre jamais dans `baseline_dirty_source_files` ni dans `campaign_touched_source_files`, et reste hors du scope doc-cleanup.
+- For `<N> > 1`, create it at startup.
+- For a single cycle, create it only when scope warrants it: long workload, many artifacts or phases, subagent use, or concrete interruption risk. The normal short loop does not create one.
+- If a single cycle without a file becomes blocked after a mutation, create the file before returning control to preserve resumability.
+- Do not duplicate workloads, baselines, double-checks, or evidence already stored in `performance_findings.md`.
+- This state file is not a source file: it never enters `baseline_dirty_source_files` or `campaign_touched_source_files`, and remains outside doc-cleanup scope.
 
-Format minimal :
+Minimal format:
 
 ```markdown
-# Campagne performance-cycle
-- Début : YYYY-MM-DD — cible : <N> cycles — terminés : <k>
-- Courant : <scope ou PERF-NNN, ou « aucun »> — phase : <sélection|audit|double-check|fix|validation>
-- Baseline sale : <paths relatifs au root, ou « aucun »>
-- Fichiers touchés : <paths relatifs au root, ou « aucun »>
-- Non actionnables : <ID (verdict), …, ou « aucun »>
-- Blocage : <cause précise, ou « aucun »>
+# performance-cycle campaign
+- Started: YYYY-MM-DD — target: <N> cycles — completed: <k>
+- Current: <scope or PERF-NNN, or "none"> — phase: <selection|audit|double-check|fix|validation>
+- Dirty baseline: <root-relative paths, or "none">
+- Touched files: <root-relative paths, or "none">
+- Non-actionable: <ID (verdict), ..., or "none">
+- Blocker: <precise cause, or "none">
 ```
 
-Mettre ce fichier à jour aux frontières de phase, après chaque mutation et après chaque cycle. Le supprimer à la clôture normale ; le conserver sur un arrêt bloquant.
+Update this file at phase boundaries, after each mutation, and after each cycle. Delete it at normal closeout; retain it on a blocking stop.
 
-### Reprise
+### Resume
 
-À la reprise d'une campagne persistée :
+When resuming a persisted campaign:
 
-1. Relire le ledger et comparer le tree courant à la baseline sale et aux fichiers touchés enregistrés. Traiter toute nouvelle modification extérieure à la campagne comme un WIP protégé.
-2. Reprendre `Courant` et `phase` au lieu de sélectionner un nouvel ID. Ne réutiliser aucune preuve dont le code, le workload ou l'environnement pertinent a changé.
-3. En phase `sélection`, `audit` ou `double-check`, rejouer proprement la phase atomique inachevée.
-4. En phase `fix` ou `validation`, inspecter le diff conservé et les dernières mesures avant toute action. Continuer le même ID seulement si une correction et une validation sûres restent possibles dans le scope autorisé ; sinon conserver le blocage et demander une décision ciblée.
-5. Ne jamais supprimer, stasher ou revert automatiquement le diff d'une tentative non validée, et ne jamais passer à un autre finding tant que cette tentative n'est pas résolue.
+1. Reread the ledger and compare the current tree with the dirty baseline and recorded touched files. Treat any new campaign-external modification as protected WIP.
+2. Resume `Current` and `phase` instead of selecting a new ID. Reuse no evidence whose code, workload, or relevant environment has changed.
+3. In `selection`, `audit`, or `double-check` phase, cleanly replay the unfinished atomic phase.
+4. In `fix` or `validation` phase, inspect the preserved diff and latest measurements before any action. Continue the same ID only if safe correction and validation remain possible within the authorized scope; otherwise preserve the blocker and request a targeted decision.
+5. Never automatically delete, stash, or revert the diff of an unvalidated attempt, and never move to another finding until that attempt is resolved.
 
-## Définition d'un cycle
+## Cycle definition
 
-Un cycle traite **une hypothèse de performance attribuable** : un finding Pending existant, ou un finding sélectionné après un nouvel audit. Il ne fixe qu'un seul `PERF-NNN`, même si l'audit en produit plusieurs, afin de préserver l'attribution du gain.
+A cycle processes **one attributable performance hypothesis**: an existing Pending finding, or a finding selected after a new audit. It fixes only one `PERF-NNN`, even if the audit produces several, to preserve gain attribution.
 
-Le cycle est terminé lorsque le finding a été double-checké puis résolu, archivé `NO-GO` ou déclaré non actionnable pour la campagne. Un audit mesuré clean ou inconclusif sans finding compte comme source traitée, puis provoque un arrêt anticipé plutôt que la recherche artificielle d'un fix. Un triage concluant à la couverture matérielle atteinte arrête la campagne avant même un audit — jamais d'audit de complaisance sur un scope immatériel. Un fix non validé ne termine pas le cycle.
+The cycle is complete when the finding has been double-checked, then resolved, archived `NO-GO`, or declared non-actionable for the campaign. A measured clean or inconclusive audit without findings counts as a processed source, then causes an early stop instead of an artificial search for a fix. Triage concluding that material coverage has been reached stops the campaign before an audit—never run a box-checking audit on an immaterial scope. An unvalidated fix does not complete the cycle.
 
-### 1. Choisir la source
+### 1. Choose the source
 
-1. Prioriser un Pending actionnable dont le workload enregistré est sûr et reproductible.
-2. À preuve comparable, classer par sévérité, exposition, fraîcheur de la mesure, scope alphabétique, puis ID croissant. Estimer l'exposition depuis des preuves ; ne jamais fabriquer une fréquence de production.
-3. Exclure les IDs `GO-mais-après-X` ou `INCONCLUSIF` déjà rencontrés pendant la campagne tant que leur condition n'a pas changé. Réévaluer un prérequis devenu satisfait avant de rendre l'ID actionnable.
-4. Réutiliser un double-check `GO` seulement après avoir vérifié que code, workload, environnement pertinent et blast radius n'ont pas changé.
-5. Sans Pending actionnable, exécuter `performance audit auto`, triage de matérialité compris. Retenir automatiquement la cible principale du classement atomique si son workload est local, sûr, court et non ambigu ; annoncer le plan de mesure sans gate. Si la meilleure cible matérielle exige un workload long ou coûteux, demander une autorisation ciblée avec coût/durée estimés plutôt que descendre vers un candidat immatériel plus commode. Si le triage conclut à la couverture matérielle atteinte, consigner les éventuelles lignes `skipped`, arrêter la campagne tôt et relayer `selection:coverage-stop` dans le récap.
-6. Si l'audit produit plusieurs findings, sélectionner un seul ID pour ce cycle et laisser les autres Pending. S'il est clean ou inconclusif, compter la source traitée puis arrêter tôt.
+1. Prioritize an actionable Pending finding whose recorded workload is safe and reproducible.
+2. With comparable evidence, rank by severity, exposure, measurement freshness, alphabetical scope, then ascending ID. Estimate exposure from evidence; never fabricate production frequency.
+3. Exclude `GO-but-after-X` or `INCONCLUSIVE` IDs already encountered during the campaign while their condition remains unchanged. Reevaluate a newly satisfied prerequisite before making the ID actionable.
+4. Reuse a `GO` double-check only after verifying that code, workload, relevant environment, and blast radius have not changed.
+5. Without an actionable Pending finding, run `performance audit auto`, including materiality triage. Automatically retain the top target from the atomic ranking if its workload is local, safe, short, and unambiguous; announce the measurement plan without a gate. If the best material target requires a long or costly workload, request targeted authorization with estimated cost/duration instead of dropping to a more convenient immaterial candidate. If triage concludes that material coverage has been reached, record any `skipped` lines, stop the campaign early, and relay `selection:coverage-stop` in the recap.
+6. If the audit produces several findings, select one ID for this cycle and leave the others Pending. If it is clean or inconclusive, count the processed source, then stop early.
 
-### 2. Double-checker
+### 2. Double-check
 
-Exécuter intégralement `performance double-check <ID>` avant toute édition source : reproduire la baseline, re-profiler, vérifier la comparabilité, le blast radius, les risques et l'acceptation affinée, puis persister le verdict. La clause same-session du mode double-check s'applique : une baseline et un profil mesurés par l'audit du même cycle, code/workload/environnement intacts, se réutilisent sans re-mesure — le double-check reste obligatoire pour l'attribution alternative, le blast radius, les risques et l'acceptation.
+Run `performance double-check <ID>` completely before any source edit: reproduce the baseline, profile again, verify comparability, blast radius, risks, and refined acceptance, then persist the verdict. The double-check mode's same-session clause applies: a baseline and profile measured by the same cycle's audit may be reused without remeasurement when code/workload/environment remain intact—the double-check remains mandatory for alternative attribution, blast radius, risks, and acceptance.
 
-- `GO` : poursuivre vers le fix.
-- `GO-mais-après-X` : garder Pending, ajouter aux non actionnables et ne pas fixer avant satisfaction puis nouveau contrôle du prérequis.
-- `INCONCLUSIF` : garder Pending, ajouter aux non actionnables et ne proposer aucun fix.
-- `NO-GO` : archiver selon le format atomique, quel qu'en soit le motif ; ne garder Pending qu'en présence d'un scénario crédible de réévaluation, en l'ajoutant alors aux non actionnables.
+- `GO`: proceed to the fix.
+- `GO-but-after-X`: keep Pending, add to non-actionable, and do not fix before satisfaction followed by a new prerequisite check.
+- `INCONCLUSIVE`: keep Pending, add to non-actionable, and propose no fix.
+- `NO-GO`: archive using the atomic format regardless of reason; keep Pending only when a credible reevaluation scenario exists, then add it to non-actionable.
 
-### 3. Fixer et mesurer
+### 3. Fix and measure
 
-1. Annoncer un plan court : fichiers, mécanisme, tests, benchmark et risque de maintenabilité.
-2. Recapturer si nécessaire une mesure `avant` immédiate avec le protocole enregistré.
-3. Implémenter le plus petit changement crédible sans toucher l'index ni l'historique git.
-4. Ajouter les fichiers source réellement modifiés à `campaign_touched_source_files` ; ne pas inclure les seuls fichiers `.code-quality` ou artefacts de build.
-5. Lancer les tests ciblés puis les checks projet proportionnés. Ajouter seulement le test ou benchmark minimal nécessaire pour protéger un contrat modifié ou un compromis de performance non évident.
-6. Rejouer exactement le benchmark comparable, calculer gain et dispersion, puis contrôler le diff avec le garde-fou de maintenabilité.
-7. Si toutes les conditions atomiques sont satisfaites, déplacer directement l'ID vers Resolved, compléter history, appliquer le cap et annoncer la résolution sans confirmation supplémentaire.
-8. Si les tests échouent, si le gain est absent ou dans la variance, si la mesure devient non comparable ou si la dette est injustifiée : laisser l'ID Pending, conserver le diff sans revert automatique, créer ou garder le fichier de campagne avec la cause dans `Blocage`, puis arrêter la campagne pour review.
-9. Ne jamais auto-résoudre les findings voisins. Signaler ceux qui partagent le workload ou les paths comme candidats à une re-mesure ultérieure.
+1. Announce a short plan: files, mechanism, tests, benchmark, and maintainability risk.
+2. If necessary, recapture an immediate `before` measurement with the recorded protocol.
+3. Implement the smallest credible change without touching the Git index or history.
+4. Add source files actually modified to `campaign_touched_source_files`; do not include files solely under `.code-quality` or build artifacts.
+5. Run targeted tests, then proportionate project checks. Add only the minimum test or benchmark needed to protect a changed contract or non-obvious performance tradeoff.
+6. Replay the exact comparable benchmark, calculate gain and dispersion, then inspect the diff with the maintainability guardrail.
+7. If all atomic conditions are satisfied, move the ID directly to Resolved, complete history, apply the cap, and announce resolution without further confirmation.
+8. If tests fail, gain is absent or within variance, measurement becomes non-comparable, or debt is unjustified: leave the ID Pending, preserve the diff without automatic revert, create or retain the campaign file with the cause under `Blocker`, then stop the campaign for review.
+9. Never auto-resolve neighboring findings. Report those sharing the workload or paths as candidates for later remeasurement.
 
-### 4. Compter et continuer
+### 4. Count and continue
 
-Après les invariants d'un cycle terminé, incrémenter le compteur. Continuer jusqu'au premier événement :
+After the invariants of a completed cycle, increment the counter. Continue until the first event:
 
-- `<N>` cycles terminés ;
-- une nouvelle source auditée est `clean`, `inconclusif` ou ne laisse aucun finding immédiatement actionnable ;
-- le triage conclut à la couverture matérielle atteinte — aucun candidat matériel restant, avant même un audit ;
-- aucun Pending actionnable ne subsiste et aucun nouveau workload sûr ne peut être sélectionné ;
-- une validation ou une autorité devient réellement bloquante.
+- `<N>` cycles completed;
+- a newly audited source is `clean`, `inconclusive`, or leaves no immediately actionable finding;
+- triage concludes that material coverage has been reached—no material candidate remains, before an audit even runs;
+- no actionable Pending finding remains and no new safe workload can be selected;
+- validation or authority becomes genuinely blocking.
 
-Un board vidé par un fix ne suffit pas à arrêter une campagne multi-cycle : lancer un nouvel audit si la cible n'est pas atteinte. Ne jamais inventer un workload, un finding ou une optimisation pour remplir le quota.
+A board emptied by a fix does not suffice to stop a multi-cycle campaign: run a new audit if the target has not been reached. Never invent a workload, finding, or optimization to fill the quota.
 
-## Mesures, sous-agents et mutations
+## Measurements, subagents, and mutations
 
-Préserver l'intégrité expérimentale avant la vitesse d'exécution.
+Prioritize experimental integrity over execution speed.
 
-- Sérialiser tous les benchmarks, profils, builds et autres travaux CPU, mémoire ou I/O susceptibles de perturber une mesure. Ne jamais comparer des runs obtenus pendant une activité concurrente contrôlable.
-- Pour `<N> > 1`, utiliser des sous-agents lorsque le runtime les expose pour les inventaires, call sites, blast radius et revues de diff en lecture seule. Pour un cycle unique, les utiliser seulement si le scope le justifie.
-- Suspendre ou attendre tous les sous-agents avant chaque warmup, baseline, profil et mesure après fix. Aucun sous-agent ne lance son propre workload de performance.
-- Sérialiser les écritures du ledger et du code. Un seul écrivain agit à la fois, et l'orchestrateur vérifie ses preuves et son diff.
-- Rester agnostique du fournisseur et du modèle : décrire la capacité requise, puis laisser le runtime choisir son défaut stable.
+- Serialize all benchmarks, profiles, builds, and other CPU, memory, or I/O work liable to disturb a measurement. Never compare runs obtained during controllable concurrent activity.
+- For `<N> > 1`, use subagents when exposed by the runtime for inventories, call sites, blast radius, and read-only diff reviews. For a single cycle, use them only when scope warrants it.
+- Suspend or await all subagents before every warmup, baseline, profile, and post-fix measurement. No subagent runs its own performance workload.
+- Serialize ledger and code writes. Only one writer acts at a time, and the orchestrator verifies its evidence and diff.
+- Remain provider- and model-agnostic: describe the required capability, then let the runtime choose its stable default.
 
-## Clôture doc-cleanup de campagne
+## Campaign doc-cleanup closeout
 
-Sauf `--no-doc-cleanup`, exécuter **une seule** clôture documentaire après un arrêt normal de la boucle entière, jamais après chaque cycle. Si la campagne s'arrête sur un échec en laissant des edits source non validés, ne pas lancer de nettoyage par-dessus : conserver le diff pour diagnostic, garder le fichier de campagne pour la reprise, signaler la clôture non exécutée et ne pas terminer le goal.
+Unless `--no-doc-cleanup` is set, run **one** documentation closeout after the entire loop stops normally, never after each cycle. If the campaign stops on failure with unvalidated source edits, do not layer cleanup on top: preserve the diff for diagnosis, retain the campaign file for resume, report that closeout did not run, and do not complete the goal.
 
-1. Calculer `cleanup_files = campaign_touched_source_files - baseline_dirty_source_files`, réduit aux fichiers source existants encore modifiés à la fin ; l'union couvre tous les cycles.
-2. Si `cleanup_files` est vide, annoncer que la clôture est sans objet et ne pas forcer une passe.
-3. Sinon, charger `doc-cleanup` et exécuter son mode `session --files <liste explicite>`. Ne jamais retomber silencieusement sur le scope global `git status`.
-4. Pendant cette clôture orchestrée, ne pas effectuer un rename dont le blast radius sort de `cleanup_files`, y compris vers `baseline_dirty_source_files` ; garder ou dé-drifter un commentaire court à la place. Le scope final reste ainsi exact et aucun nouveau fichier n'est introduit après son calcul.
-5. Laisser `doc-cleanup` appliquer sa doctrine, valider une fois le scope agrégé et écrire une seule ligne de couverture session.
+1. Compute `cleanup_files = campaign_touched_source_files - baseline_dirty_source_files`, reduced to existing source files still modified at the end; the union covers every cycle.
+2. If `cleanup_files` is empty, announce that closeout is not applicable and do not force a pass.
+3. Otherwise, load `doc-cleanup` and run its `session --files <explicit list>` mode. Never silently fall back to global `git status` scope.
+4. During this orchestrated closeout, do not perform a rename whose blast radius leaves `cleanup_files`, including into `baseline_dirty_source_files`; keep or de-drift a short comment instead. The final scope thus remains exact and no new file is introduced after calculation.
+5. Let `doc-cleanup` apply its doctrine, validate the aggregate scope once, and write a single session coverage line.
 
-Les fichiers sales avant la campagne restent exclus si l'utilisateur a exceptionnellement autorisé un fix qui les chevauche : préserver le WIP préexistant prime sur l'exhaustivité du nettoyage. Les lister dans le récap comme exclus de la clôture.
+Files dirty before the campaign remain excluded if the user exceptionally authorized an overlapping fix: preserving pre-existing WIP takes precedence over cleanup completeness. List them in the recap as excluded from closeout.
 
-## Récap final et invariants
+## Final recap and invariants
 
-Après une clôture normale — doc-cleanup exécuté, déclaré sans objet ou désactivé par `--no-doc-cleanup` — supprimer `performance_campaign.md` s'il existe. Rendre un récap compact : cycles terminés/cible, scopes mesurés, scopes écartés `exposure-capped` avec leurs calculs, IDs et verdicts, avant/après, validations, clôture doc-cleanup, fichiers protégés ou touchés, findings actionnables restants et raison d'arrêt. Si la campagne s'est arrêtée sur couverture matérielle atteinte, relayer la question de `selection:coverage-stop` — quelle opération semble lente à l'usage — pour ouvrir un audit `feature` ciblé.
+After normal closeout—doc-cleanup run, declared not applicable, or disabled by `--no-doc-cleanup`—delete `performance_campaign.md` if it exists. Return a compact recap: completed/target cycles, measured scopes, `exposure-capped` scopes rejected with their calculations, IDs and verdicts, before/after, validations, doc-cleanup closeout, protected or touched files, remaining actionable findings, and stop reason. If the campaign stopped because material coverage was reached, relay the `selection:coverage-stop` question—which operation feels slow in use—to open a targeted `feature` audit.
 
-Avant de terminer, vérifier :
+Before finishing, verify:
 
-- aucune modification source n'a précédé le double-check `GO` ;
-- aucun audit n'a été lancé sur un scope au plafond d'exposition démontrable ;
-- chaque résolution repose sur des mesures comparables, un gain hors variance, des tests OK et le garde-fou de maintenabilité ;
-- un seul finding a été fixé par cycle et aucun voisin n'a été auto-résolu ;
-- aucune mesure potentiellement concurrente n'a tourné ;
-- aucun `git add`, `commit`, `push`, workload externe ou opération destructive n'a été exécuté sans autorisation ;
-- doc-cleanup a tourné au plus une fois, sur la liste explicite agrégée, ou son absence est expliquée ;
-- le fichier de campagne est absent après une clôture normale, ou conservé et signalé sur un arrêt bloquant ;
-- le goal natif n'est terminé que si la campagne et sa clôture demandée sont réellement achevées.
+- no source modification preceded its `GO` double-check;
+- no audit ran on a scope with a demonstrable exposure ceiling;
+- every resolution rests on comparable measurements, gain outside variance, passing tests, and the maintainability guardrail;
+- only one finding was fixed per cycle and no neighbor was auto-resolved;
+- no potentially concurrent measurement ran;
+- no `git add`, `commit`, `push`, external workload, or destructive operation ran without authorization;
+- doc-cleanup ran at most once, on the aggregate explicit list, or its absence is explained;
+- the campaign file is absent after normal closeout, or retained and reported on a blocking stop;
+- the native goal is complete only if the campaign and requested closeout are genuinely complete.

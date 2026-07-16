@@ -1,142 +1,142 @@
-# Doctrine de performance
+# Performance doctrine
 
-Référence normative à lire avant tout audit, double-check, update ou fix. Elle définit ce qui mérite un finding `PERF`, comment mesurer et comment empêcher une optimisation de dégrader gratuitement le code.
+Normative reference to read before any audit, double-check, update, or fix. It defines what warrants a `PERF` finding, how to measure, and how to prevent an optimization from needlessly degrading the code.
 
-## Contrat du workload
+## Workload contract
 
-Toute conclusion porte sur un workload explicite, jamais sur « le programme » en général. Décrire au minimum :
+Every conclusion applies to an explicit workload, never to "the program" in general. Describe at least:
 
-- le scénario ou l'opération exercée ;
-- la commande ou procédure reproductible, sanitised si elle contient des paramètres sensibles ;
-- la taille et la nature synthétique/réelle des entrées ;
-- le mode de build et la configuration influençant la mesure ;
-- le warmup, le nombre de répétitions et la statistique retenue ;
-- l'environnement utile à la comparaison (OS/architecture, runtime/toolchain, local/CI/conteneur), sans persister de secrets.
+- the scenario or operation exercised;
+- the reproducible command or procedure, sanitized if it contains sensitive parameters;
+- the size and synthetic/real nature of the inputs;
+- the build mode and configuration affecting the measurement;
+- warmup, number of repetitions, and selected statistic;
+- the environment relevant to comparison (OS/architecture, runtime/toolchain, local/CI/container), without persisting secrets.
 
-Pour une feature, tracer d'abord son point d'entrée, les principaux call sites et le chemin de données. Pour un path, identifier l'opération réellement représentative qui l'exerce. Un microbenchmark isolé n'est valable que si le coût isolé domine réellement le scénario utilisateur ou si le finding porte explicitement sur cette primitive.
+For a feature, first trace its entry point, main call sites, and data path. For a path, identify the genuinely representative operation that exercises it. An isolated microbenchmark is valid only if the isolated cost actually dominates the user scenario or if the finding explicitly concerns that primitive.
 
-## Hiérarchie de preuve
+## Evidence hierarchy
 
-Utiliser les signaux dans cet ordre :
+Use signals in this order:
 
-1. **Mesure end-to-end reproductible** : latence, throughput, ressources ou courbe sous charge sur un scénario représentatif.
-2. **Profil relié à cette mesure** : CPU samples, allocations, I/O, contention, requêtes ou traces localisant le coût.
-3. **Expérience contrôlée** : variante temporaire ou désactivation ciblée confirmant l'hypothèse.
-4. **Inspection statique** : complexité algorithmique, copies, appels I/O ou verrous visibles. Sert à formuler une hypothèse, jamais à prouver seule un finding.
+1. **Reproducible end-to-end measurement**: latency, throughput, resources, or load curve on a representative scenario.
+2. **Profile linked to that measurement**: CPU samples, allocations, I/O, contention, queries, or traces localizing the cost.
+3. **Controlled experiment**: temporary variant or targeted disablement confirming the hypothesis.
+4. **Static inspection**: algorithmic complexity, copies, visible I/O calls, or locks. Used to formulate a hypothesis, never to prove a finding on its own.
 
-Un finding persistant exige au minimum les niveaux 1 et 2, sauf impossibilité intrinsèque de profiler démontrée. Dans ce cas, une expérience contrôlée de niveau 3 peut remplacer le profil si elle attribue clairement le coût. Sans attribution suffisante, écrire un audit `inconclusif`, pas un finding.
+A persistent finding requires at least levels 1 and 2, except when an inherent inability to profile is demonstrated. In that case, a level-3 controlled experiment may replace the profile if it clearly attributes the cost. Without sufficient attribution, record an `inconclusive` audit, not a finding.
 
-## Hypothèses, exposition et matérialité
+## Hypotheses, exposure, and materiality
 
-La preuve de performance habite l'exécution ; le **ciblage**, lui, habite la couche statique. Trois étages épistémiques, du moins cher au plus cher :
+Performance evidence lives in execution; **targeting** lives in the static layer. Three epistemic levels, from least to most expensive:
 
-1. **Hypothèse** — supposition issue de la lecture du code et du raisonnement d'exposition. Elle porte une localisation, un mécanisme suspecté, une exposition sourcée et l'expérience minimale qui la falsifierait. Elle sert à classer les cibles et à orienter le plan de mesure ; elle n'a pas d'ID, n'entre jamais dans le board et ne se présente jamais comme un problème avéré.
-2. **Finding** — hypothèse confirmée par la hiérarchie de preuve (mesure + attribution). Seuil inchangé.
-3. **Verdict** — finding re-vérifié par double-check avant tout fix.
+1. **Hypothesis** — an assumption from code reading and exposure reasoning. It carries a location, suspected mechanism, sourced exposure, and the minimal experiment that would falsify it. It ranks targets and guides the measurement plan; it has no ID, never enters the board, and is never presented as a confirmed problem.
+2. **Finding** — a hypothesis confirmed through the evidence hierarchy (measurement + attribution). Threshold unchanged.
+3. **Verdict** — a finding re-verified by double-check before any fix.
 
-### Raisonnement d'exposition
+### Exposure reasoning
 
-L'exposition s'estime **depuis des preuves**, jamais de mémoire : configs et cadences observables (intervalle de tick, fréquence d'un heartbeat, cron), tailles et bornes des données réelles, commandes versionnées (Makefile, scripts, CI), documentation, et qui attend concrètement sur l'opération (opérateur, utilisateur final, pipeline). Ne jamais fabriquer de chiffres : une exposition sans preuve se déclare indéterminable. Côté coût, la lecture statique ne fournit qu'un **ordre de grandeur plausible** — caches, compilateurs et tailles réelles déjouent l'intuition ; conclure un coût reste le rôle exclusif de la mesure.
+Estimate exposure **from evidence**, never from memory: observable configs and cadences (tick interval, heartbeat frequency, cron), real-data sizes and bounds, versioned commands (Makefile, scripts, CI), documentation, and who concretely waits on the operation (operator, end user, pipeline). Never fabricate figures: exposure without evidence is declared indeterminable. On the cost side, static reading provides only a **plausible order of magnitude**—caches, compilers, and real sizes defeat intuition; concluding a cost remains the exclusive role of measurement.
 
-### Matérialité plausible
+### Plausible materiality
 
-Matérialité plausible d'une cible = exposition sourcée × ordre de grandeur de coût plausible :
+Plausible materiality of a target = sourced exposure × plausible cost order of magnitude:
 
-- **forte** — opération que quelqu'un attend réellement et souvent, ou coût croissant avec des données non bornées ;
-- **moyenne** — exposition réelle mais modérée, ou coût plausible incertain sans plafond démontrable ;
-- **capée (exposure-capped)** — un plafond structurel d'exposition borne tout gain plausible sous la matérialité, calcul explicite à l'appui (ex. : migration 1×/lancement × quelques ms majorées ; boucle ~1 Hz × coût ns-µs). Mesurer un scope capé ne pourrait produire aucun finding quel que soit le résultat : il se consigne sans harnais ;
-- **indéterminable** — aucune preuve d'exposition disponible ; à déclarer, jamais à deviner.
+- **high** — an operation someone actually and frequently waits for, or a cost growing with unbounded data;
+- **medium** — real but moderate exposure, or uncertain plausible cost with no demonstrable cap;
+- **capped (exposure-capped)** — a structural exposure ceiling bounds any plausible gain below materiality, supported by an explicit calculation (e.g., migration 1×/startup × a few upper-bounded ms; loop ~1 Hz × ns–µs cost). Measuring a capped scope could produce no finding regardless of the result: record it without a harness;
+- **indeterminable** — no exposure evidence available; declare it, never guess.
 
-### La réfutation est un résultat de première classe
+### Refutation is a first-class result
 
-Une hypothèse mesurée puis réfutée, ou un scope capé consigné avec son calcul, valent un audit réussi : ils documentent où le temps ne se perd pas. Ne pas produire de finding de consolation, et ne pas relancer un harnais pour re-démontrer un plafond déjà consigné dont ni le code ni l'exposition n'ont changé.
+A measured and refuted hypothesis, or a capped scope recorded with its calculation, constitutes a successful audit: it documents where time is not being lost. Do not produce a consolation finding, and do not rerun a harness to re-demonstrate an already recorded ceiling when neither code nor exposure has changed.
 
-## Mesures comparables
+## Comparable measurements
 
-- Faire un warmup adapté aux caches, JIT, pools et connexions.
-- Exécuter assez de répétitions pour observer la dispersion ; préférer médiane et percentiles aux meilleurs temps.
-- Mesurer avant et après dans le même environnement et aussi près que possible dans le temps.
-- Garder identiques données, concurrence, configuration, build mode et dépendances externes.
-- Rapporter la variabilité ou un intervalle simple. Si la différence est du même ordre que la dispersion, conclure `inconclusif`.
-- Éviter de mélanger temps de compilation/startup et steady-state sauf si le startup est précisément la métrique.
-- Pour la scalabilité, mesurer plusieurs niveaux de charge ou tailles d'entrée et observer la courbe, la saturation et le backpressure ; un seul point ne démontre pas une propriété de scaling.
+- Perform warmup appropriate for caches, JIT, pools, and connections.
+- Run enough repetitions to observe dispersion; prefer median and percentiles over best times.
+- Measure before and after in the same environment and as close together in time as possible.
+- Keep data, concurrency, configuration, build mode, and external dependencies identical.
+- Report variability or a simple interval. If the difference is the same order as the dispersion, conclude `inconclusive`.
+- Avoid mixing compilation/startup time and steady-state unless startup is specifically the metric.
+- For scalability, measure multiple load levels or input sizes and observe the curve, saturation, and backpressure; one point does not demonstrate a scaling property.
 
-La baseline n'est pas un nombre nu. Format attendu : `<valeur> <unité>, <statistique>, <répétitions>, dispersion <valeur>, environnement/build court`.
+A baseline is not a bare number. Expected format: `<value> <unit>, <statistic>, <repetitions>, dispersion <value>, short environment/build`.
 
-## Axes et sévérité
+## Axes and severity
 
-Axes seed, non fermés :
+Seed, non-exhaustive axes:
 
-| Axe | Exemples de métriques |
+| Axis | Example metrics |
 |---|---|
-| Latence | médiane, p95/p99, startup, temps par opération |
-| Throughput | requêtes/s, jobs/s, lignes/s, octets/s |
-| CPU | temps CPU, cycles, samples, utilisation par unité de travail |
-| Mémoire | RSS, heap, pic mémoire, allocations/opération, rétention |
-| I/O | requêtes DB, lectures/écritures, octets, round-trips réseau |
-| Contention | temps bloqué, lock wait, queue wait, saturation de pool |
-| Scalabilité | pente coût/taille, débit sous concurrence, point de saturation |
+| Latency | median, p95/p99, startup, time per operation |
+| Throughput | requests/s, jobs/s, rows/s, bytes/s |
+| CPU | CPU time, cycles, samples, utilization per unit of work |
+| Memory | RSS, heap, peak memory, allocations/operation, retention |
+| I/O | DB queries, reads/writes, bytes, network round trips |
+| Contention | blocked time, lock wait, queue wait, pool saturation |
+| Scalability | cost/size slope, throughput under concurrency, saturation point |
 
-Sévérité = **impact mesuré × exposition réelle** :
+Severity = **measured impact × real exposure**:
 
-- **HIGH** — SLO ou capacité violé sur un chemin central/fréquent, saturation ou croissance non bornée menaçant le fonctionnement, régression majeure confirmée.
-- **MED** — coût matériel et répété, marge de capacité sensiblement réduite ou feature perceptiblement lente, sans blocage immédiat.
-- **LOW** — coût vérifié mais faible ou peu exposé. Ne pas conserver un LOW dont le gain potentiel est inférieur au bruit ou au coût de complexité.
+- **HIGH** — SLO or capacity violation on a central/frequent path, saturation or unbounded growth threatening operation, confirmed major regression.
+- **MED** — material and repeated cost, noticeably reduced capacity margin, or perceptibly slow feature, without immediate blockage.
+- **LOW** — verified but low or weakly exposed cost. Do not retain a LOW whose potential gain is below noise or complexity cost.
 
-Ne pas appliquer de seuil universel en millisecondes ou pourcentage. Une milliseconde dans une boucle appelée un million de fois et 100 ms dans une tâche mensuelle n'ont pas la même exposition.
+Do not apply a universal threshold in milliseconds or percentages. One millisecond in a loop called a million times and 100 ms in a monthly task do not have the same exposure.
 
-## Quand ne pas produire de finding
+## When not to produce a finding
 
-Ne pas créer de finding lorsque :
+Do not create a finding when:
 
-- aucun workload représentatif et sûr n'est disponible ;
-- la baseline n'est pas reproductible ;
-- l'écart observé est absorbé par la variance ;
-- le profiler ne relie pas le coût au code ciblé et aucune expérience ne confirme l'hypothèse ;
-- le coût vient principalement d'un service externe hors scope et aucune action locale crédible n'existe ;
-- la recommandation repose sur une intuition comme « les allocations sont lentes » sans impact mesuré ;
-- l'optimisation proposée échange un gain marginal contre une forte dette de correction ou de maintenabilité ;
-- le comportement est déjà dans le budget convenu et aucune contrainte de capacité ne justifie le travail.
+- no representative and safe workload is available;
+- the baseline is not reproducible;
+- the observed difference is absorbed by variance;
+- the profiler does not link the cost to the targeted code and no experiment confirms the hypothesis;
+- the cost mainly comes from an out-of-scope external service and no credible local action exists;
+- the recommendation relies on intuition such as "allocations are slow" without measured impact;
+- the proposed optimization trades a marginal gain for substantial correctness or maintainability debt;
+- behavior is already within the agreed budget and no capacity constraint justifies the work.
 
-Un audit sans finding peut être `clean` seulement si le workload a réellement été mesuré et respecte le budget ou ne montre aucun bottleneck actionnable. Sans mesure suffisante, utiliser `inconclusif`.
+An audit without a finding may be `clean` only if the workload was actually measured and meets the budget or shows no actionable bottleneck. Without sufficient measurement, use `inconclusive`.
 
-## Garde-fou de maintenabilité
+## Maintainability guardrail
 
-Évaluer ce garde-fou lors de la recommandation, puis sur le diff du fix :
+Evaluate this guardrail during recommendation, then on the fix diff:
 
-- préserver les contrats et tests de correction ;
-- éviter duplication, état partagé, branches et indirections sans gain mesuré ;
-- confiner toute spécialisation au hot path démontré ;
-- nommer les concepts et documenter le **pourquoi performance** lorsque le code devient volontairement non évident ;
-- conserver ou ajouter le benchmark qui rend le compromis vérifiable ;
-- préférer la variante la plus simple lorsque les résultats sont équivalents dans la variance ;
-- expliciter dans le finding toute dette acceptée et pourquoi le gain la justifie.
+- preserve correctness contracts and tests;
+- avoid duplication, shared state, branches, and indirections without measured gain;
+- confine any specialization to the demonstrated hot path;
+- name concepts and document the **performance rationale** when code intentionally becomes non-obvious;
+- retain or add the benchmark that makes the tradeoff verifiable;
+- prefer the simplest variant when results are equivalent within variance;
+- state any accepted debt in the finding and why the gain justifies it.
 
-La propreté n'est pas un DRY mécanique. Dupliquer localement une petite boucle ou éviter une abstraction peut être légitime si cela supprime un coût matériel, mais seulement avec preuve, confinement et benchmark anti-régression.
+Cleanliness is not mechanical DRY. Locally duplicating a small loop or bypassing an abstraction may be legitimate if it removes a material cost, but only with evidence, confinement, and a regression benchmark.
 
-## Choix des outils
+## Tool selection
 
-Préférer dans cet ordre :
+Prefer, in this order:
 
-1. commandes de benchmark/load test déjà versionnées dans le projet ;
-2. instrumentation et profiler natifs du langage ou runtime déjà disponibles ;
-3. outils système présents (`hyperfine`, `/usr/bin/time`, `perf`, profilers de mémoire/I/O) ;
-4. harness éphémère sous `/tmp` si le scénario reste représentatif et ne modifie pas le projet.
+1. benchmark/load-test commands already versioned in the project;
+2. native language/runtime instrumentation and profilers already available;
+3. installed system tools (`hyperfine`, `/usr/bin/time`, `perf`, memory/I/O profilers);
+4. an ephemeral harness under `/tmp` if the scenario remains representative and does not modify the project.
 
-Détecter les outils opportunément et s'adapter au langage. Ne pas installer de dépendance ou contacter un service externe sans autorisation. Un outil absent dégrade la profondeur, jamais les exigences de preuve.
+Detect tools opportunistically and adapt to the language. Do not install a dependency or contact an external service without authorization. A missing tool reduces depth, never the evidence requirements.
 
-## Workloads client et navigateur
+## Client and browser workloads
 
-Le code exécuté dans un navigateur ou un client graphique s'audite avec la même doctrine ; seul le harness change. Un harness navigateur (Lighthouse, Playwright/Puppeteer avec tracing, profil devtools) est un outil comme un autre dans l'ordre de préférence ci-dessus et suit les mêmes règles d'installation et d'autorisation.
+Code executed in a browser or graphical client is audited under the same doctrine; only the harness changes. A browser harness (Lighthouse, Playwright/Puppeteer with tracing, devtools profile) is a tool like any other in the preference order above and follows the same installation and authorization rules.
 
-Les métriques web sont des instances des axes existants : LCP, INP, TTI et temps de frame relèvent de la latence ; poids de bundle et octets transférés de l'I/O ; temps de script, layout et paint du CPU. Un performance budget versionné (taille de bundle, seuils Lighthouse) compte comme budget existant.
+Web metrics are instances of the existing axes: LCP, INP, TTI, and frame time fall under latency; bundle weight and transferred bytes under I/O; script, layout, and paint time under CPU. A versioned performance budget (bundle size, Lighthouse thresholds) counts as an existing budget.
 
-Exigences spécifiques :
+Specific requirements:
 
-- exercer un build de production servi localement ; un déploiement distant reste soumis à la règle d'autorisation explicite ;
-- fixer le throttling CPU/réseau, le mode headless/headed et la version du navigateur, et les persister dans la signature d'environnement ;
-- choisir cache froid ou cache chaud comme condition de mesure et l'annoncer ; ne pas mélanger les deux dans une même série ;
-- les runs navigateur sont particulièrement bruyants : répétitions, médiane/percentiles et dispersion s'appliquent strictement avant conclusion ;
-- le poids de bundle se mesure sur la sortie du build de production, la commande de build servant de workload reproductible.
+- exercise a production build served locally; a remote deployment remains subject to the explicit-authorization rule;
+- fix CPU/network throttling, headless/headed mode, and browser version, and persist them in the environment signature;
+- choose cold or warm cache as the measurement condition and state it; do not mix them in one series;
+- browser runs are especially noisy: repetitions, median/percentiles, and dispersion apply strictly before any conclusion;
+- measure bundle weight from the production build output, with the build command as the reproducible workload.
 
-Sans harness disponible ni moyen sûr d'exercer le client, conclure `inconclusif`, comme pour tout autre workload.
+Without an available harness or a safe way to exercise the client, conclude `inconclusive`, as for any other workload.

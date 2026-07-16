@@ -1,65 +1,65 @@
-# Mode : list
+# Mode: list
 
-Référence chargée par SKILL.md en mode **list**. **Pas d'audit, pas de re-vérification, aucune écriture de fichier.** Lecture seule des deux fichiers projet.
+Reference loaded by SKILL.md in **list** mode. **No audit, no re-verification, no file writes.** Read-only access to the two project files.
 
-## Flux
+## Flow
 
-1. Lire `maintainability_findings.md` et `maintainability_history.md`.
-2. Compter les pending par sévérité. Lister les IDs avec un one-liner descriptif (extrait de l'observation, ~50 chars).
-3. **Compter et lister à part les findings stale** (pending dont la bullet `Status` est `stale ...` ou `stale-after-<ID> ...`) — distincts des actifs car ils nécessitent une action utilisateur (relocaliser, marquer résolu, ou archiver) avant de pouvoir être traités. Ils restent inclus dans le total Pending.
-4. Lister les résolus des 30 derniers jours (filtrer par la date dans le titre Resolved). **Périmètre assumé : la seule section `## Resolved`** (cap 8) — l'archive n'est pas relue (design, cf. `references/file-formats.md`). Si les 8 entrées de la section tombent toutes dans la fenêtre, la liste est probablement tronquée : le signaler (cf. template).
-5. Lister les entrées du rolling actif zonal (les `N` premières lignes **non `crosscut:*`** de history, cf. `references/file-formats.md > Lignes crosscut`). `N` en mode list : la valeur de l'override `<!-- rolling_size: M -->` s'il existe, sinon **5 par défaut d'affichage** — le `N` exact dépend de la taille de l'inventaire, que le mode list (read-only) ne recalcule pas.
-6. **Rolling crosscut** : lister les `Nx` lignes `crosscut:*` les plus récentes de history (`Nx = 6` par défaut, override `<!-- crosscut_rolling_size: M -->`). Même format de ligne que le rolling zonal : `<date> — crosscut:<DIM> — <N findings (status)>`. Omettre la section si aucune ligne crosscut.
-7. Détecter les batches groupables parmi les pending **actifs uniquement** (les stale sont exclus du batching, cf. *Batches suggérés*).
+1. Read `maintainability_findings.md` and `maintainability_history.md`.
+2. Count pending findings by severity. List IDs with a descriptive one-liner (observation excerpt, ~50 chars).
+3. **Count and separately list stale findings** (pending entries whose `Status` bullet is `stale ...` or `stale-after-<ID> ...`)—separate from active entries because they require user action (relocate, mark resolved, or archive) before treatment. They remain included in total Pending.
+4. List findings resolved in the last 30 days (filter on the date in the Resolved title). **Deliberate scope: only the `## Resolved` section** (cap 8)—do not reread the archive (design; see `references/file-formats.md`). If all 8 section entries fall inside the window, the list is probably truncated: report this (see template).
+5. List active zonal rolling entries (the first `N` **non-`crosscut:*`** history lines; see `references/file-formats.md > Crosscut lines`). In list mode, `N` is the `<!-- rolling_size: M -->` override if present, otherwise **5 as the display default**—exact `N` depends on inventory size, which read-only list mode does not recompute.
+6. **Crosscut rolling**: list the most recent `Nx` `crosscut:*` history lines (`Nx = 6` by default; override `<!-- crosscut_rolling_size: M -->`). Same line format as zonal rolling: `<date> — crosscut:<DIM> — <N findings (status)>`. Omit the section if there are no crosscut lines.
+7. Detect groupable batches among **active pending findings only** (stale entries are excluded; see *Suggested batches*).
 
-## Sortie
+## Output
 
-Utiliser le template `list:dashboard`. Cas dégénérés :
+Use template `list:dashboard`. Degenerate cases:
 
-- Zéro pending actif (peut-être stale) : afficher `Pending actifs (0) : aucun finding actionnable.` La section Stale reste affichée si non vide.
-- Zéro stale : omettre entièrement la section Stale (ne pas afficher `Stale (0)`).
-- Zéro audit : afficher `Aucun audit dans l'historique. Invoque maintainability en mode audit pour commencer.`
+- Zero active pending findings (possibly stale): display `Active pending (0): no actionable finding.` Keep the Stale section if non-empty.
+- Zero stale: omit the entire Stale section (do not display `Stale (0)`).
+- Zero audits: display `No audits in history. Invoke maintainability in audit mode to begin.`
 
-## Batches suggérés
+## Suggested batches
 
-**Détection** (lecture seule, pas d'analyse de code) :
+**Detection** (read-only, no code analysis):
 
-1. Pour chaque pending, extraire ID, dimension prefix, path (le *primaire* du titre pour les findings multi-fichiers), audit_origin (date `Détecté:`), et contenu de la dernière section `Double-check` si présente.
-2. **Signaux explicites** (haute priorité) dans le Double-check, regex insensibles à la casse : `bundle`/`bundler`, `sequencing`/`étape \d+`, `après <ID>`/`avant <ID>`, `couplé avec <ID>`. Chaque mention d'un autre `<ID>` connu crée une arête ; composantes connexes = batches.
-3. **Signaux heuristiques** (fallback) : même path exact ; sinon même path parent + même dimension prefix ; sinon même audit_origin. Les findings crosscut du même run partagent l'audit_origin (date du crosscut) — ils peuvent batcher entre eux via cette voie sans cas spécial.
-4. Garder seulement les batches de 2 à 5 findings. Lister explicites en premier, compléter avec heuristiques. Max 3 affichés.
-5. Si aucun batch valide : afficher *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt de sélection.
+1. For each pending finding, extract ID, dimension prefix, path (title's *primary* path for multi-file findings), audit_origin (`Detected:` date), and content of the latest `Double-check` section if present.
+2. **Explicit signals** (high priority) in Double-check, case-insensitive regexes: `bundle`/`bundler`, `sequencing`/`step \d+`, `after <ID>`/`before <ID>`, `coupled with <ID>`. Each mention of another known `<ID>` creates an edge; connected components are batches.
+3. **Heuristic signals** (fallback): same exact path; otherwise same parent path + same dimension prefix; otherwise same audit_origin. Crosscut findings from the same run share audit_origin (crosscut date)—they may batch via this route without a special case.
+4. Keep only batches of 2–5 findings. List explicit batches first, fill with heuristic batches. Display at most 3.
+5. If no valid batch: display *"No obvious batch detected—the pending findings are independent."* and **omit** the selection prompt.
 
-**Format d'affichage** : intégré dans le template `list:dashboard` (section *Batches suggérés*).
+**Display format**: integrated into template `list:dashboard` (*Suggested batches* section).
 
-**Recommandation** : marquer un batch `★ recommandé` selon ces critères, dans l'ordre :
+**Recommendation**: mark a batch `★ recommended` by these criteria, in order:
 
-1. **Scope minimal** : préférer 1 fichier > module > multi-modules (blast radius bas).
-2. **Signal explicite** : préférer un batch issu d'un signal explicite sur un batch heuristique.
-3. **`|Δ LoC|` le plus faible** (changement le plus contenu).
-4. **Tie-break** : ID le plus petit (`B1` > `B2` > …).
+1. **Smallest scope**: prefer 1 file > module > multi-module (low blast radius).
+2. **Explicit signal**: prefer an explicitly signaled batch over a heuristic one.
+3. **Smallest `|Δ LoC|`** (most contained change).
+4. **Tie-break**: smallest ID (`B1` > `B2` > …).
 
-La raison courte affichée à côté du `★` reprend le critère qui a tranché (ex. `1 fichier, blast radius bas`, `co-design explicite`, `Δ LoC contenu`).
+The short reason beside `★` repeats the deciding criterion (e.g. `1 file, low blast radius`, `explicit co-design`, `contained Δ LoC`).
 
-Si aucun batch ne se distingue (≥ 2 batches strictement équivalents sur les 4 critères) : ne pas marquer `★`. Le prompt d'action devient *"Plusieurs batches équivalents — choisis selon ta priorité (`double-check B<n>`, `fix B<n>`, `rien`)."*
+If no batch stands out (≥ 2 batches exactly equal on all 4 criteria): do not mark `★`. The action prompt becomes *"Several equivalent batches—choose by priority (`double-check B<n>`, `fix B<n>`, `nothing`)."*
 
-**Action selon la réponse utilisateur** :
+**Action based on user response**:
 
-- **`double-check B<n>`** : exécuter le flux de `references/mode-double-check.md` sur chaque finding du batch dans l'ordre. Sortie agrégée via `double-check:autonomous-batch`, suivie de `double-check:autonomous-batch-proposition`. Action selon choix utilisateur : cf. `references/mode-audit.md > I. Action post-proposition batch`.
-- **`fix B<n>`** (l'exécution applique systématiquement les checkpoints décrits ci-dessous — l'utilisateur n'a pas à le préciser) :
-  1. Plan par finding (1-3 lignes : fichiers touchés, ordre, Δ LoC attendu) — réutilise `Reco affinée` si présente, sinon `Reco`.
-  2. Afficher le plan global, demander un OK explicite. Si OK, exécuter dans l'ordre.
-  3. **Avant** chaque marquage `Resolution`, lancer la suite de tests (détectée via marqueurs : `cargo test`, `npm test`, `pytest`, `go test ./...`, etc. ; sinon demander la commande). Tests OK → flux résolution intra-session. Tests KO → arrêt, ne pas marquer, annoncer ; pas de revert auto.
-  4. **Cascade re-check** automatique après chaque résolution du batch (cf. `references/cascade.md`) — sans nouveau prompt puisque l'OK plan global de l'étape 2 couvre.
-  5. Récap final via le template `cascade:recap-batch`.
-- **`rien`** : terminer sans rien faire.
+- **`double-check B<n>`**: run `references/mode-double-check.md` flow on each batch finding in order. Aggregate output via `double-check:autonomous-batch`, followed by `double-check:autonomous-batch-proposition`. For action after the user's choice, see `references/mode-audit.md > I. Post-batch-proposal action`.
+- **`fix B<n>`** (execution always applies the checkpoints below—the user need not specify them):
+  1. Plan per finding (1–3 lines: files touched, order, expected Δ LoC)—reuse `Refined recommendation` if present, otherwise `Recommendation`.
+  2. Display the global plan; require explicit approval. If approved, execute in order.
+  3. **Before** marking each `Resolution`, run the test suite (detected from markers: `cargo test`, `npm test`, `pytest`, `go test ./...`, etc.; otherwise ask for the command). Tests pass → in-session resolution flow. Tests fail → stop, do not mark, report; no automatic revert.
+  4. Automatic **cascade re-check** after each batch resolution (see `references/cascade.md`)—without a new prompt because step 2's global-plan approval covers it.
+  5. Final recap via template `cascade:recap-batch`.
+- **`nothing`**: finish without action.
 
-**Cas dégénérés** : batch ID invalide ("B5" alors que seuls B1/B2 listés) → demander relance de `list`. Finding déjà résolu entre `list` et action → skip avec annonce.
+**Degenerate cases**: invalid batch ID (`"B5"` when only B1/B2 are listed) → ask to rerun `list`. Finding resolved between `list` and action → skip and report.
 
-## Cas du projet sans state
+## Project without state
 
-Si `<STATE_DIR>/maintainability_*.md` n'existent pas, **ne pas bootstrapper** (mode list est lecture seule). Annoncer : *"Aucun audit de maintenabilité sur ce projet. Invoque le skill `maintainability` en mode audit pour bootstrapper."*
+If `<STATE_DIR>/maintainability_*.md` do not exist, **do not bootstrap** (list mode is read-only). Report: *"No maintainability audit exists for this project. Invoke the `maintainability` skill in audit mode to bootstrap."*
 
-## Invariants de fin de mode (list)
+## End-of-mode invariants (list)
 
-Aucune écriture attendue — vérifier qu'aucun fichier projet n'a été modifié pendant le mode (read-only strict). Si l'utilisateur a déclenché `double-check B<n>` ou `fix B<n>`, les invariants des flux correspondants (`references/mode-audit.md > I` ou *Résolution intra-session* de `references/mode-update.md`) s'appliquent.
+No writes expected—verify no project file was modified during this strictly read-only mode. If the user triggered `double-check B<n>` or `fix B<n>`, the corresponding flow invariants (`references/mode-audit.md > I` or *In-session resolution* in `references/mode-update.md`) apply.

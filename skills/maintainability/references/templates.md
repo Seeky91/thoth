@@ -1,321 +1,321 @@
-# Templates de sortie chat
+# Chat output templates
 
-Référence chargée par SKILL.md avant chaque sortie chat d'un mode. Les modes citent un template par nom (e.g. `audit:summary`) ; ce fichier en donne le format normatif. Les conventions transverses (header, trailer, séparation récap / proposition d'action) sont définies dans SKILL.md — pas répétées ici.
+Reference loaded by SKILL.md before every mode's chat output. Modes cite a template by name (e.g., `audit:summary`); this file provides its normative format. Cross-cutting conventions (header, trailer, summary/action-proposal separation) are defined in SKILL.md—not repeated here.
 
-Suivre ces templates **à la lettre** (structure, headers, trailers, placeholders). Le contenu des placeholders s'adapte au contexte, mais l'ossature ne change pas. Garde-fou contre la dérive de format d'une invocation à l'autre.
+Follow these templates **exactly** (structure, headers, trailers, placeholders). Placeholder content adapts to context, but the skeleton does not change. This guards against format drift between invocations.
 
-## Sommaire
+## Contents
 
-- Sélection : `selection:proposition`
-- Audit : `audit:summary`, `audit:clean`, `audit:proposition`, `audit:proposition-min`
-- Crosscut : `crosscut:dim-proposition`, `crosscut:summary`, `crosscut:clean`
-- Suivi : `list:dashboard`, `update:summary`
-- Double-check : `double-check:output`, `double-check:autonomous-batch`, et leurs propositions
-- Résolution : `resolution:confirm`, `resolution:done`, `cascade:recap-batch`
-- Archive : `archive-clear:confirm-all`, `archive-clear:confirm-partial`, `archive-clear:done`
+- Selection: `selection:proposition`
+- Audit: `audit:summary`, `audit:clean`, `audit:proposition`, `audit:proposition-min`
+- Crosscut: `crosscut:dim-proposition`, `crosscut:summary`, `crosscut:clean`
+- Tracking: `list:dashboard`, `update:summary`
+- Double-check: `double-check:output`, `double-check:autonomous-batch`, and their proposals
+- Resolution: `resolution:confirm`, `resolution:done`, `cascade:recap-batch`
+- Archive: `archive-clear:confirm-all`, `archive-clear:confirm-partial`, `archive-clear:done`
 
-## `selection:proposition` — Annonce de la zone candidate (mode audit auto)
-
-```
-Je propose : <zone> (<motif>, <taille LoC>)
-Alternatives : <zone-alt-1> (<motif>, <taille>) ou <zone-alt-2> (<motif>, <taille>)
-```
-
-- `<motif>` reflète à la fois la nature de la zone et son état d'activité (cf. `references/mode-audit.md > C. Signal d'activité`) :
-  - **Couverture** : `jamais auditée`, `god file`, `pipeline traçable`, `landmark architectural`, `composition root locale`, `façade publique structurante`.
-  - **Activité** : `chaude — <N> commits depuis le dernier audit (YYYY-MM-DD)`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`.
-  - Les deux peuvent se combiner : `pipeline traçable, chaud — 12 commits depuis 2026-03-08`.
-  - En mode dégradé (repo non-git) : omettre toute mention d'activité, ne garder que le motif de couverture.
-- 2 alternatives par défaut. Si l'inventaire en propose moins, lister celles disponibles. Idéalement, montrer un mélange (une zone du niveau de priorité retenu + une d'un niveau différent pour donner du choix à l'utilisateur).
-
-## `audit:summary` — Audit avec findings
+## `selection:proposition` — Candidate-area announcement (auto audit mode)
 
 ```
-Audit terminé — <zone>
-
-<N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
-  <ID> (<SEV>, Δ ~<delta>) — <observation-courte>
-  ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
-
-Δ LoC net estimé si tout est appliqué : ~<sum> (somme algébrique — suppressions et ajouts confondus ; le détail signé par finding est ci-dessus).
-
-Files mis à jour : <STATE_DIR>/maintainability_findings.md (+<N> findings), <STATE_DIR>/maintainability_history.md (+1 ligne).
-Pour creuser un item à la main : invoquer `maintainability` en mode double-check avec `<ID-exemple>`.
+I propose: <area> (<reason>, <LoC size>)
+Alternatives: <alt-area-1> (<reason>, <size>) or <alt-area-2> (<reason>, <size>)
 ```
 
-Suivi du bloc `audit:proposition` ou `audit:proposition-min` selon le nombre de findings.
+- `<reason>` reflects both the area's nature and activity state (see `references/mode-audit.md > C. Activity signal`):
+  - **Coverage:** `never audited`, `god file`, `traceable pipeline`, `architectural landmark`, `local composition root`, `structuring public facade`.
+  - **Activity:** `hot — <N> commits since the last audit (YYYY-MM-DD)`, `cold — audited on YYYY-MM-DD, no non-maintainability activity since`.
+  - Both may be combined: `traceable pipeline, hot — 12 commits since 2026-03-08`.
+  - In degraded mode (non-Git repo): omit all activity mentions and retain only the coverage reason.
+- 2 alternatives by default. If the inventory provides fewer, list those available. Ideally, show a mix (one area at the selected priority level + one at another level to give the user a choice).
 
-## `audit:clean` — Audit zone propre (0 findings)
-
-```
-Audit terminé — <zone>. Aucun finding produit, zone propre sur toutes les dimensions examinées.
-
-Files mis à jour : <STATE_DIR>/maintainability_history.md (+1 ligne `0 findings (clean)`).
-```
-
-Pas de bloc de proposition derrière (rien à proposer).
-
-## `audit:proposition` — Proposition de double-check autonome (3 options)
+## `audit:summary` — Audit with findings
 
 ```
-Tu peux aussi me laisser creuser en autonomie. Sur quoi ?
-  (a) un panel de quick-wins : <ID-1>, <ID-2>, <ID-3> — <K> findings au fix court et peu de blast radius.
-  (b) le finding le plus structurant : <ID-heavy> — <résumé observation>.
-  (c) rien, je verrai plus tard.
+Audit complete — <area>
+
+<N> new findings (<X> HIGH, <Y> MED, <Z> LOW):
+  <ID> (<SEV>, Δ ~<delta>) — <short-observation>
+  ... (one per finding, order: HIGH > MED > LOW, ascending ID within each)
+
+Estimated net LoC Δ if all are applied: ~<sum> (algebraic sum—deletions and additions combined; signed detail per finding appears above).
+
+Files updated: <STATE_DIR>/maintainability_findings.md (+<N> findings), <STATE_DIR>/maintainability_history.md (+1 line).
+To investigate an item manually: invoke `maintainability` in double-check mode with `<example-ID>`.
 ```
 
-Si aucun quick-win ne tient les critères : omettre (a). Si aucun HIGH/MED structurant : (b) prend le plus grand `|Δ LoC|` avec avertissement *"(pas un finding lourd au sens classique)"*.
+Followed by the `audit:proposition` or `audit:proposition-min` block according to the number of findings.
 
-## `audit:proposition-min` — Variante 1 ou 2 findings
-
-```
-Veux-tu que je fasse un double-check autonome sur <ID> ?
-```
-
-Si 2 findings : citer les deux IDs.
-
-## `crosscut:dim-proposition` — Annonce de la dimension candidate (mode crosscut)
+## `audit:clean` — Clean-area audit (0 findings)
 
 ```
-Je propose un crosscut sur : <DIM> (<motif>)
-Alternatives : <DIM-alt-1> (<motif>) ou <DIM-alt-2> (<motif>)
+Audit complete — <area>. No findings produced; area clean across all examined dimensions.
+
+Files updated: <STATE_DIR>/maintainability_history.md (+1 `0 findings (clean)` line).
 ```
 
-- `<motif>` ∈ {`jamais crosscutée`, `non vue depuis Nj`, `signal fort sur <zones>`, `aléatoire pondéré`, etc.}
-- 2 alternatives par défaut, parmi les éligibles `{DUP, INC, DRF, DED, BND, ARC}` hors `<DIM>` proposé. Si moins disponible (rolling restrictif), lister celles disponibles.
+No proposal block follows (nothing to propose).
 
-## `crosscut:summary` — Crosscut avec findings
-
-```
-Crosscut <DIM> terminé
-
-<N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
-  <ID> (<SEV>, Δ ~<delta>, <K> fichiers) — <observation-courte>
-  ... (un par finding, ordre : HIGH > MED > LOW, ID croissant à l'intérieur)
-
-Δ LoC net estimé si tout est appliqué : ~<sum> (somme algébrique — suppressions et ajouts confondus ; le détail signé par finding est ci-dessus).
-
-Files mis à jour : <STATE_DIR>/maintainability_findings.md (+<N> findings), <STATE_DIR>/maintainability_history.md (+1 ligne `crosscut:<DIM>`).
-Pour creuser un item à la main : invoquer `maintainability` en mode double-check avec `<ID-exemple>`.
-```
-
-`<K> fichiers` = nombre d'emplacements distincts listés dans la `Localisation` du finding (1 pour un finding mono-fichier comme `DED` global, ≥2 pour `DUP`/`INC`/`DRF`/`BND`).
-
-Sweep partiel (fallback sans outil) : insérer `Couverture : N/M zones scannées — outil <X> absent` juste avant le trailer `Files mis à jour`, et la ligne history citée porte le suffixe `[partiel : N/M zones]`.
-
-Suivi du bloc `audit:proposition` ou `audit:proposition-min` selon le nombre de findings (les templates de proposition d'action sont génériques sur la nature de l'audit — pas de version dédiée crosscut).
-
-## `crosscut:clean` — Crosscut sans finding
+## `audit:proposition` — Autonomous double-check proposal (3 options)
 
 ```
-Crosscut <DIM> terminé. Aucun finding cross-zone produit sur cette dimension.
-
-Files mis à jour : <STATE_DIR>/maintainability_history.md (+1 ligne `crosscut:<DIM> — 0 findings (clean)`).
+You can also let me investigate autonomously. Which option?
+  (a) a quick-win panel: <ID-1>, <ID-2>, <ID-3> — <K> findings with a short fix and limited blast radius.
+  (b) the most structurally significant finding: <heavy-ID> — <observation summary>.
+  (c) nothing; I will revisit later.
 ```
 
-Sweep partiel : remplacer la première ligne par `Crosscut <DIM> terminé — couverture : N/M zones scannées (outil <X> absent). Aucun finding sur l'échantillon.` et la ligne history citée porte le suffixe `[partiel : N/M zones]`.
+If no quick win meets the criteria, omit (a). If there is no structurally significant HIGH/MED finding, (b) uses the largest `|Δ LoC|` with warning `"(not a heavy finding in the conventional sense)"`.
 
-Pas de bloc de proposition derrière (rien à proposer).
-
-## `list:dashboard` — Tableau de bord (read-only)
+## `audit:proposition-min` — 1- or 2-finding variant
 
 ```
-Maintainability board — <projet>
+Would you like me to autonomously double-check <ID>?
+```
 
-Pending (<total>) :
-  HIGH (<n>) : <ID-1> (<desc-50char>), <ID-2> (<desc>), …
-  MED  (<n>) : <ID> (<desc>), …
-  LOW  (<n>) : <ID> (<desc>), …
+For 2 findings, cite both IDs.
 
-Stale (<n>) — à relocaliser, marquer résolu, ou archiver :
-  <ID> — stale-after-<ID-cause> (fix du <date>, localisation invalidée)
-  <ID> — stale (<raison>)
+## `crosscut:dim-proposition` — Candidate-dimension announcement (crosscut mode)
 
-Recently resolved (30 derniers j.) :
-  <ID> (<SEV>) — <date> — <résumé-fix>
+```
+I propose a crosscut on: <DIM> (<reason>)
+Alternatives: <alt-DIM-1> (<reason>) or <alt-DIM-2> (<reason>)
+```
 
-Rolling (N=<N>) :
-  <date> — <zone> — <N findings (status)>
-  ... (N lignes, les plus récentes en premier)
+- `<reason>` ∈ {`never crosscut`, `not seen for N days`, `strong signal in <areas>`, `weighted random`, etc.}
+- 2 alternatives by default, from eligible dimensions `{DUP, INC, DRF, DED, BND, ARC}` other than proposed `<DIM>`. If fewer are available (restrictive rolling window), list those available.
 
-Rolling crosscut (Nx=<Nx>) :
+## `crosscut:summary` — Crosscut with findings
+
+```
+Crosscut <DIM> complete
+
+<N> new findings (<X> HIGH, <Y> MED, <Z> LOW):
+  <ID> (<SEV>, Δ ~<delta>, <K> files) — <short-observation>
+  ... (one per finding, order: HIGH > MED > LOW, ascending ID within each)
+
+Estimated net LoC Δ if all are applied: ~<sum> (algebraic sum—deletions and additions combined; signed detail per finding appears above).
+
+Files updated: <STATE_DIR>/maintainability_findings.md (+<N> findings), <STATE_DIR>/maintainability_history.md (+1 `crosscut:<DIM>` line).
+To investigate an item manually: invoke `maintainability` in double-check mode with `<example-ID>`.
+```
+
+`<K> files` = number of distinct locations listed in the finding's `Location` (1 for a single-file finding such as global `DED`, ≥2 for `DUP`/`INC`/`DRF`/`BND`).
+
+Partial sweep (tool-free fallback): insert `Coverage: N/M areas scanned — tool <X> unavailable` immediately before the `Files updated` trailer, and give the cited history line the suffix `[partial: N/M areas]`.
+
+Followed by the `audit:proposition` or `audit:proposition-min` block according to finding count (action-proposal templates are generic across audit types—there is no dedicated crosscut version).
+
+## `crosscut:clean` — Crosscut without findings
+
+```
+Crosscut <DIM> complete. No cross-area finding produced for this dimension.
+
+Files updated: <STATE_DIR>/maintainability_history.md (+1 `crosscut:<DIM> — 0 findings (clean)` line).
+```
+
+Partial sweep: replace the first line with `Crosscut <DIM> complete — coverage: N/M areas scanned (tool <X> unavailable). No finding in the sample.` and give the cited history line the suffix `[partial: N/M areas]`.
+
+No proposal block follows (nothing to propose).
+
+## `list:dashboard` — Dashboard (read-only)
+
+```
+Maintainability board — <project>
+
+Pending (<total>):
+  HIGH (<n>): <ID-1> (<50-char-desc>), <ID-2> (<desc>), …
+  MED  (<n>): <ID> (<desc>), …
+  LOW  (<n>): <ID> (<desc>), …
+
+Stale (<n>) — relocate, mark resolved, or archive:
+  <ID> — stale-after-<cause-ID> (<date> fix, location invalidated)
+  <ID> — stale (<reason>)
+
+Recently resolved (last 30 days):
+  <ID> (<SEV>) — <date> — <fix-summary>
+
+Rolling (N=<N>):
+  <date> — <area> — <N findings (status)>
+  ... (N lines, most recent first)
+
+Rolling crosscut (Nx=<Nx>):
   <date> — crosscut:<DIM> — <N findings (status)>
-  ... (Nx lignes max, les plus récentes en premier)
+  ... (at most Nx lines, most recent first)
 
-Batches suggérés (<K>) :
+Suggested batches (<K>):
 
-  B1 · <zone-ou-multi> · Δ ~<sum> · <K> findings  [★ recommandé : <raison>]
-       <ID·SEV> + <ID·SEV> + … — <rationale 1 ligne>
+  B1 · <area-or-multi> · Δ ~<sum> · <K> findings  [★ recommended: <reason>]
+       <ID·SEV> + <ID·SEV> + … — <one-line rationale>
 
-  B2 · <zone> · Δ ~<sum> · <K> findings
+  B2 · <area> · Δ ~<sum> · <K> findings
        <ID·SEV> + … — <rationale>
 
-Je propose `double-check B<reco>` (recommandé).
-Sinon : `fix B<reco>` direct, un autre batch (`double-check B<n>` / `fix B<n>`), ou `rien`.
+I propose `double-check B<recommended>` (recommended).
+Otherwise: direct `fix B<recommended>`, another batch (`double-check B<n>` / `fix B<n>`), or `nothing`.
 ```
 
-Omissions :
-- Section Stale : omise si zéro.
-- Section Recently resolved : afficher *"Aucun résolu dans les 30 derniers jours."* si zéro. Si les 8 entrées du cap Resolved tombent toutes dans la fenêtre : suffixer le titre de section `(fenêtre possiblement tronquée au cap Resolved — l'archive n'est pas relue)`.
-- Section Batches : si zéro batch détecté, remplacer par *"Pas de batch évident détecté — les pendings sont indépendants."* et **omettre** le prompt d'action.
-- Si zéro pending actif : remplacer la ligne par `Pending actifs (0) : aucun finding actionnable.`.
-- Section `Rolling crosscut` : omise entièrement si aucune ligne `crosscut:*` dans l'history. Si moins de `Nx` lignes crosscut existent, lister celles disponibles (pas de padding).
+Omissions:
+- Stale section: omit if zero.
+- Recently resolved section: show `"None resolved in the last 30 days."` if zero. If all 8 entries under the Resolved cap fall within the window, suffix the section title with `(window possibly truncated at the Resolved cap—the archive is not reread)`.
+- Batches section: if zero batches are detected, replace it with `"No obvious batch detected—the pending findings are independent."` and **omit** the action prompt.
+- If zero active pending findings: replace the line with `Active pending (0): no actionable finding.`.
+- `Rolling crosscut` section: omit entirely if history has no `crosscut:*` line. If fewer than `Nx` crosscut lines exist, list those available (no padding).
 
-## `update:summary` — Récap update
+## `update:summary` — Update summary
 
 ```
-Update terminé — <projet>
+Update complete — <project>
 
-Re-vérifié <N> pendings :
-  Résolus (<n>) : <ID-1>, <ID-2>
-  Auto-relocalisés (<n>) : <ID> (<old-path> → <new-path>, <signal>)
-  Auto-résolus stale (<n>) : <ID> (<raison : pattern dissout / commit <hash>>)
-  Toujours présents (<n>) : <ID-3>, <ID-4>, <ID-5>
-  Stale (<n>) : <ID> (<raison investigation inconclusive>)
-  Stale-after (<n>) : <ID> (stale-after-<ID-cause> préservé)
-  Archivés (<n>) : <ID-1>, <ID-2> (cap Resolved atteint)
+Rechecked <N> pending findings:
+  Resolved (<n>): <ID-1>, <ID-2>
+  Auto-relocated (<n>): <ID> (<old-path> → <new-path>, <signal>)
+  Auto-resolved stale (<n>): <ID> (<reason: pattern dissolved / commit <hash>>)
+  Still present (<n>): <ID-3>, <ID-4>, <ID-5>
+  Stale (<n>): <ID> (<reason: inconclusive investigation>)
+  Stale-after (<n>): <ID> (stale-after-<cause-ID> preserved)
+  Archived (<n>): <ID-1>, <ID-2> (Resolved cap reached)
 
-Files mis à jour : <STATE_DIR>/maintainability_findings.md, <STATE_DIR>/maintainability_history.md[, <STATE_DIR>/maintainability_resolved_archive.md].
+Files updated: <STATE_DIR>/maintainability_findings.md, <STATE_DIR>/maintainability_history.md[, <STATE_DIR>/maintainability_resolved_archive.md].
 ```
 
-Lignes à 0 : omises (e.g. pas de stale-after → pas de ligne, pas d'auto-relocalisé → pas de ligne).
+Zero-count lines are omitted (e.g., no stale-after → no line, no auto-relocated → no line).
 
-## `double-check:output` — Sortie standard d'un double-check
+## `double-check:output` — Standard double-check output
 
 ```
 Double-check <ID> — <verdict>
 
-Localisation : <path:line>
-Blast radius : <N> imports, <N> tests touchés, <surfaces>
-Faisabilité : <résumé>
-Effort : <S|M|L> (~<estimation temps/commits>)
-Δ LoC affiné : ~<delta> (<comparaison estimation initiale si écart >50%>)
-Reco affinée : <reco>
-Verdict : <GO|NO-GO|GO-mais-après-X>
-Apport : <phrase concrète> (uniquement si verdict GO ou GO-mais-après-X)
+Location: <path:line>
+Blast radius: <N> imports, <N> tests touched, <surfaces>
+Feasibility: <summary>
+Effort: <S|M|L> (~<time/commit estimate>)
+Refined Δ LoC: ~<delta> (<comparison with initial estimate if delta >50%>)
+Refined recommendation: <recommendation>
+Verdict: <GO|NO-GO|GO-but-after-X>
+Benefit: <concrete sentence> (only for a GO or GO-but-after-X verdict)
 
-[Extraits de code des call sites pertinents si utiles à la décision]
+[Code excerpts from relevant call sites if useful to the decision]
 
-Files mis à jour : <STATE_DIR>/maintainability_findings.md (section Double-check ajoutée[, titre amendé : <SEV> → <NEW-SEV>]).
+Files updated: <STATE_DIR>/maintainability_findings.md (Double-check section added[, title amended: <SEV> → <NEW-SEV>]).
 ```
 
-## `double-check:autonomous-batch` — Sortie agrégée d'un panel quick-wins ou batch fix
+## `double-check:autonomous-batch` — Aggregate output for a quick-win panel or fix batch
 
 ```
-Double-check autonome terminé sur <K> <findings|quick-wins> :
-  <ID-1> — <verdict> (Δ <delta>, <résumé-1-ligne>) — Apport : <phrase>
-  <ID-2> — <verdict> (Δ <delta>, <résumé>) — Apport : <phrase>
-  <ID-3> — <verdict> (Δ <delta>, <résumé>) [pas d'Apport si NO-GO]
+Autonomous double-check complete for <K> <findings|quick-wins>:
+  <ID-1> — <verdict> (Δ <delta>, <one-line-summary>) — Benefit: <sentence>
+  <ID-2> — <verdict> (Δ <delta>, <summary>) — Benefit: <sentence>
+  <ID-3> — <verdict> (Δ <delta>, <summary>) [no Benefit if NO-GO]
 
-Files mis à jour : <STATE_DIR>/maintainability_findings.md (+<K> sections Double-check).
+Files updated: <STATE_DIR>/maintainability_findings.md (+<K> Double-check sections).
 ```
 
-## `double-check:proposition` — Proposition d'action après double-check simple
+## `double-check:proposition` — Action proposal after a single double-check
 
-Affiché juste après `double-check:output`. Options filtrées selon le verdict.
+Shown immediately after `double-check:output`. Options are filtered by verdict.
 
-**Variante verdict GO / GO-mais-après-X** :
+**GO / GO-but-after-X verdict variant:**
 ```
-Que faire pour <ID> ?
-  (a) Fix maintenant — plan + tests + résolution intra-session.
-  (b) Plus tard — le Double-check est écrit, tu pourras y revenir via le mode list.
-```
-
-**Variante verdict NO-GO** :
-```
-Verdict NO-GO. Que faire pour <ID> ?
-  (a) Archiver — marquer résolu avec motif `archivé après double-check (NO-GO : <raison-courte>)`.
-  (b) Garder pending — utile si le NO-GO mérite re-statuation plus tard.
+What should be done for <ID>?
+  (a) Fix now — plan + tests + in-session resolution.
+  (b) Later — the Double-check is recorded; you can return to it via list mode.
 ```
 
-## `double-check:autonomous-batch-proposition` — Proposition d'action après batch double-check
-
-Affiché juste après `double-check:autonomous-batch`. Options filtrées selon le mix de verdicts du batch.
-
-**Variante mix GO + NO-GO** :
+**NO-GO verdict variant:**
 ```
-Que faire des <K> findings double-checkés ?
-  (a) Fix tous les GO dans l'ordre : <ID-GO-1> → <ID-GO-2> → … (raison : <critère>). Archive auto des NO-GO : <ID-NG-1>, <ID-NG-2>.
-  (b) Fix un seul GO — précise lequel parmi <liste-GO>.
-  (c) Archiver les NO-GO seulement, garder les GO pending.
-  (d) Rien.
+NO-GO verdict. What should be done for <ID>?
+  (a) Archive — mark resolved with reason `archived after double-check (NO-GO: <short-reason>)`.
+  (b) Keep pending — useful if the NO-GO merits reevaluation later.
 ```
 
-**Variante tous GO** :
-```
-Que faire des <K> findings (tous GO) ?
-  (a) Fix tous dans l'ordre : <ID-1> → <ID-2> → … (raison : <critère>).
-  (b) Fix un seul — précise lequel parmi <liste>.
-  (c) Rien.
-```
+## `double-check:autonomous-batch-proposition` — Action proposal after a double-check batch
 
-**Variante tous NO-GO** :
+Shown immediately after `double-check:autonomous-batch`. Options are filtered by the batch's verdict mix.
+
+**Mixed GO + NO-GO variant:**
 ```
-Les <K> findings sont tous NO-GO. Que faire ?
-  (a) Archiver tous (motif individuel par finding).
-  (b) Garder pending.
+What should be done with the <K> double-checked findings?
+  (a) Fix all GOs in order: <GO-ID-1> → <GO-ID-2> → … (reason: <criterion>). Auto-archive NO-GOs: <NG-ID-1>, <NG-ID-2>.
+  (b) Fix one GO — specify which from <GO-list>.
+  (c) Archive NO-GOs only; keep GOs pending.
+  (d) Nothing.
 ```
 
-**Règles d'ordering pour l'option « Fix tous »** (variantes mix et tous GO), par priorité décroissante :
-1. **Dépendances explicites** : un verdict `GO-mais-après-<ID>` impose que `<ID>` soit fixé avant, **si** `<ID>` est dans le batch (sinon noter la dépendance externe et placer le finding dans l'ordre naturel).
-2. **Blast radius croissant** : les findings au blast radius le plus contenu d'abord (moins de risque de casser le suivant).
-3. **Path partagé** : regrouper les findings touchant le même fichier (une seule série de changements par fichier).
-4. **Tie-break** : ID croissant.
-
-La raison citée dans la sortie reprend le critère qui a tranché (ex. `couplage explicite`, `blast radius bas d'abord`, `regroupement par fichier`).
-
-## `resolution:confirm` — Confirmation intra-session (avec ou sans cascade)
-
-**Variante simple (overlap = 0, pas de cascade)** :
+**All-GO variant:**
 ```
-Ce fix résout <ID-primaire> (Δ <delta>). Je marque comme résolu ?
+What should be done with the <K> findings (all GO)?
+  (a) Fix all in order: <ID-1> → <ID-2> → … (reason: <criterion>).
+  (b) Fix one — specify which from <list>.
+  (c) Nothing.
 ```
 
-**Variante avec cascade** :
+**All-NO-GO variant:**
 ```
-Ce fix résout <ID-primaire> (Δ <delta>). Cascade re-check sur <K> pendings touchant les mêmes fichiers :
-  - <ID-cascade-1> — pattern absent → résolu collatéralement
-  - <ID-cascade-2> — pattern toujours présent (l. <ancien> → <nouveau>, à mettre à jour)
-  - <ID-cascade-3> — <fichier> renommé → stale-after-<ID-primaire>
-
-Je marque <ID-primaire>[+ <IDs-cascadés>] résolus[, mets à jour <IDs-shift>][, et tag <IDs-stale> stale-after] ?
+All <K> findings are NO-GO. What should be done?
+  (a) Archive all (individual reason per finding).
+  (b) Keep pending.
 ```
 
-## `resolution:done` — Confirmation finale intra-session
+**Ordering rules for the "Fix all" option** (mixed and all-GO variants), in descending priority:
+1. **Explicit dependencies:** a `GO-but-after-<ID>` verdict requires `<ID>` to be fixed first **if** `<ID>` is in the batch (otherwise note the external dependency and place the finding in natural order).
+2. **Increasing blast radius:** findings with the most contained blast radius first (lower risk of breaking the next one).
+3. **Shared path:** group findings touching the same file (one change series per file).
+4. **Tie-break:** ascending ID.
 
+The reason cited in the output reflects the deciding criterion (e.g., `explicit coupling`, `low blast radius first`, `grouped by file`).
+
+## `resolution:confirm` — In-session confirmation (with or without cascade)
+
+**Simple variant (overlap = 0, no cascade):**
 ```
-Files mis à jour : <STATE_DIR>/maintainability_findings.md (move <ID> → Resolved[+ <N> cascadés][+ <M> stale-after]), <STATE_DIR>/maintainability_history.md (résolus <ID>+...).
-```
-
-Si push-back partiel à l'étape `resolution:confirm` : la ligne reflète seulement ce qui a été appliqué.
-
-## `cascade:recap-batch` — Récap final d'un `fix B<n>` (mode list)
-
-```
-<X>/<Y> résolus, Δ LoC total mesuré : <sum>, commits : <hash1>+<hash2>+...
-Cascade re-check : <N> résolu(s) collatéralement (<IDs>), <M> stale-after (<IDs>).
-```
-
-Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est **omise**. Fixes non commités (cas normal) : `commits : non commités (diff dans l'arbre de travail)` remplace la liste de hashes.
-
-## `archive-clear:confirm-all` — Confirmation purge totale
-
-```
-Confirme la suppression totale de l'archive (<X> entrées). Tape 'oui' pour confirmer.
+This fix resolves <primary-ID> (Δ <delta>). Should I mark it resolved?
 ```
 
-Attend "oui" littéral. Tout autre input → annoncer *"Annulé."* et terminer sans écrire.
+**Cascade variant:**
+```
+This fix resolves <primary-ID> (Δ <delta>). Cascade recheck on <K> pending findings touching the same files:
+  - <cascade-ID-1> — pattern absent → resolved collaterally
+  - <cascade-ID-2> — pattern still present (line <old> → <new>, to update)
+  - <cascade-ID-3> — <file> renamed → stale-after-<primary-ID>
 
-## `archive-clear:confirm-partial` — Confirmation purge partielle
+Should I mark <primary-ID>[+ <cascaded-IDs>] resolved[, update <shift-IDs>][, and tag <stale-IDs> stale-after]?
+```
+
+## `resolution:done` — Final in-session confirmation
 
 ```
-<X> entrées seront supprimées : <ID-1>, <ID-2>, … — <Y> conservées (la plus récente : <ID> du <date>). Confirmer ? (y/N)
+Files updated: <STATE_DIR>/maintainability_findings.md (move <ID> → Resolved[+ <N> cascaded][+ <M> stale-after]), <STATE_DIR>/maintainability_history.md (resolved <ID>+...).
 ```
 
-## `archive-clear:done` — Récap purge
+For partial pushback at `resolution:confirm`, the line reflects only what was applied.
+
+## `cascade:recap-batch` — Final summary for `fix B<n>` (list mode)
 
 ```
-Archive clearée — <X> supprimées, <Y> conservées. Compteurs : DUP=<n>, SIZ=<n>, ...
+<X>/<Y> resolved, total measured LoC Δ: <sum>, commits: <hash1>+<hash2>+...
+Cascade recheck: <N> resolved collaterally (<IDs>), <M> stale-after (<IDs>).
+```
 
-Files mis à jour : <STATE_DIR>/maintainability_resolved_archive.md[, <STATE_DIR>/maintainability_findings.md (header id_counters)].
+If overlap = 0 across all batch fixes, **omit** the `Cascade recheck:` line. Uncommitted fixes (normal case): `commits: uncommitted (diff in worktree)` replaces the hash list.
+
+## `archive-clear:confirm-all` — Full-purge confirmation
+
+```
+Confirm full archive deletion (<X> entries). Type 'oui' to confirm.
+```
+
+Wait for literal `oui`. Any other input → announce `"Canceled."` and finish without writing.
+
+## `archive-clear:confirm-partial` — Partial-purge confirmation
+
+```
+<X> entries will be deleted: <ID-1>, <ID-2>, … — <Y> kept (most recent: <ID> from <date>). Confirm? (y/N)
+```
+
+## `archive-clear:done` — Purge summary
+
+```
+Archive cleared — <X> deleted, <Y> kept. Counters: DUP=<n>, SIZ=<n>, ...
+
+Files updated: <STATE_DIR>/maintainability_resolved_archive.md[, <STATE_DIR>/maintainability_findings.md (id_counters header)].
 ```

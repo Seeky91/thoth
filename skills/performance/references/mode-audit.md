@@ -1,158 +1,158 @@
-# Mode : audit
+# Mode: audit
 
-Référence chargée en mode **audit auto**, **audit path** ou **audit feature**. Lire d'abord `references/doctrine.md`, puis `references/file-formats.md` avant toute écriture.
+Reference loaded in **audit auto**, **audit path**, or **audit feature** mode. Read `references/doctrine.md` first, then `references/file-formats.md` before any write.
 
 ## Bootstrap
 
-Si l'état performance n'existe pas :
+If performance state does not exist:
 
-1. Créer `<STATE_DIR>` si nécessaire.
-2. Créer `performance_history.md` avec `# Performance audit history\n\n`.
-3. Créer `performance_findings.md` avec `# Performance findings\n\n## Pending\n\n## Resolved\n`. Ne pas créer de compteur avant le premier finding.
-4. Ne créer `performance_resolved_archive.md` qu'au premier débordement du cap Resolved.
-5. Annoncer : `Bootstrap performance sur ce projet, aucun historique préalable.`
+1. Create `<STATE_DIR>` if necessary.
+2. Create `performance_history.md` with `# Performance audit history\n\n`.
+3. Create `performance_findings.md` with `# Performance findings\n\n## Pending\n\n## Resolved\n`. Do not create a counter before the first finding.
+4. Create `performance_resolved_archive.md` only when the Resolved cap first overflows.
+5. Announce: `Bootstrapping performance for this project; no prior history.`
 
-## Inventaire, triage de matérialité et sélection automatique
+## Inventory, materiality triage, and automatic selection
 
-### Construire les cibles candidates
+### Build candidate targets
 
-Inventorier sans lire tout le repo indistinctement, en croisant deux directions (cf. `references/doctrine.md > Hypothèses, exposition et matérialité`) :
+Inventory without indiscriminately reading the entire repo, combining two directions (see `references/doctrine.md > Hypotheses, exposure, and materiality`):
 
-**Top-down — opérations attendues.** Recenser ce que quelqu'un attend réellement : commandes versionnées (Makefile, scripts, targets Cargo/Gradle, jobs CI), démarrage applicatif, routes/pages du chemin utilisateur, commandes CLI, workers, jobs et batchs dont la durée compte. Sources : manifests, scripts package, docs/README, dossiers `bench`/`benchmark`/`perf`/`load`, configs Lighthouse ou performance budget, documentation de profiling.
+**Top-down — awaited operations.** Identify what someone actually waits for: versioned commands (Makefile, scripts, Cargo/Gradle targets, CI jobs), application startup, routes/pages on the user path, CLI commands, workers, jobs, and batches whose duration matters. Sources: manifests, package scripts, docs/README, `bench`/`benchmark`/`perf`/`load` directories, Lighthouse configs or performance budgets, profiling documentation.
 
-**Bottom-up — hypothèses structurelles.** En parcourant les surfaces exécutables et chemins de données (handlers, parsing/sérialisation, requêtes, caches, boucles de traitement), formuler les indices statiques en **hypothèses falsifiables** rattachées aux candidats : boucles imbriquées sur données variables, N+1 I/O, copies/allocations visibles, verrous sur chemin fréquent, appels synchrones dans une boucle, matérialisation de gros jeux de données, travail refait à chaque appel (rechargement, re-parse). Une hypothèse n'est jamais un finding ni présentée comme telle.
+**Bottom-up — structural hypotheses.** While scanning executable surfaces and data paths (handlers, parsing/serialization, queries, caches, processing loops), formulate static clues as **falsifiable hypotheses** attached to candidates: nested loops over variable data, N+1 I/O, visible copies/allocations, locks on a frequent path, synchronous calls in a loop, materialization of large datasets, work repeated on every call (reload, reparse). A hypothesis is never a finding and is never presented as one.
 
-Compléter l'inventaire :
+Complete the inventory:
 
-1. Repérer les tests fonctionnels ou fixtures capables d'exercer ces surfaces sans trafic externe.
-2. Croiser avec l'activité git : une surface modifiée depuis son dernier audit est `chaude`. Exclure du signal les commits identifiables comme fixes performance à partir des hashes stockés dans les résolutions.
-3. Exclure vendored, généré, dépendances, fixtures géantes et artefacts de build.
+1. Identify functional tests or fixtures able to exercise these surfaces without external traffic.
+2. Cross-check Git activity: a surface modified since its last audit is `hot`. Exclude from the signal any commits identifiable as performance fixes, using the hashes stored in resolutions.
+3. Exclude vendored/generated code, dependencies, huge fixtures, and build artifacts.
 
-Chaque candidat porte : `<scope>`, paths principaux, **matérialité plausible avec son sourcing d'exposition**, hypothèses éventuelles, workload existant ou proposé, métrique possible et niveau de sécurité d'exécution.
+Each candidate carries: `<scope>`, main paths, **plausible materiality with its exposure sourcing**, any hypotheses, existing or proposed workload, possible metric, and execution safety level.
 
-### Triage de matérialité
+### Materiality triage
 
-Classer chaque candidat `forte`, `moyenne`, `capée` ou `indéterminable` selon `references/doctrine.md > Matérialité plausible` :
+Classify each candidate as `high`, `medium`, `capped`, or `indeterminable` according to `references/doctrine.md > Plausible materiality`:
 
-- L'exposition s'estime depuis des preuves (configs, cadences, tailles de données, Makefile, docs, qui attend sur l'opération) ; ne jamais fabriquer de chiffres — une exposition sans preuve rend le candidat `indéterminable`, pas `forte`.
-- **Capée** : le calcul du plafond doit être explicite et citable (fréquence structurelle × coût plausible majoré). Un scope capé sort de la sélection auto et se consigne en history avant la fin de l'invocation — ligne `skipped (exposure-capped: <calcul court>)`, cf. `references/file-formats.md` — une seule fois : ne pas ré-écrire une ligne skipped existante tant que ni le code du scope ni son exposition n'ont changé. Il reste auditable sur path ou feature explicite.
-- Le triage est bon marché et se refait à chaque audit auto ; seules ses conclusions `skipped` se persistent.
+- Estimate exposure from evidence (configs, cadences, data sizes, Makefile, docs, who waits on the operation); never fabricate figures—exposure without evidence makes the candidate `indeterminable`, not `high`.
+- **Capped:** the ceiling calculation must be explicit and citable (structural frequency × upper-bounded plausible cost). A capped scope leaves auto selection and is recorded in history before invocation ends—`skipped (exposure-capped: <short calculation>)`, see `references/file-formats.md`—once only: do not rewrite an existing skipped line while neither scope code nor exposure has changed. It remains auditable via an explicit path or feature.
+- Triage is cheap and repeated for every auto audit; only its `skipped` conclusions are persisted.
 
-### Sélectionner
+### Select
 
-Lire `performance_history.md` en entier. Construire :
+Read all of `performance_history.md`. Build:
 
-- `jamais_audité` : scope absent de toute ligne d'audit de l'historique (les lignes `skipped` ne sont pas des audits) ;
-- `chaud` : code du scope modifié depuis son dernier audit — ou depuis sa ligne `skipped`, ce qui rouvre son triage ;
-- `froid` : aucun changement depuis ;
-- `rolling` : les 4 scopes audités les plus récents (lignes `skipped` ignorées), ou la valeur de `<!-- rolling_size: N -->` si présente.
+- `never_audited`: scope absent from every audit line in history (`skipped` lines are not audits);
+- `hot`: scope code modified since its last audit—or since its `skipped` line, reopening triage;
+- `cold`: no change since;
+- `rolling`: the 4 most recently audited scopes (`skipped` lines ignored), or the value of `<!-- rolling_size: N -->` if present.
 
-Comparer les scopes `feature:` par les paths entre crochets, pas par la description libre (cf. `references/file-formats.md`) : une feature reformulée qui couvre matériellement les mêmes paths n'est ni `jamais_audité` ni une nouvelle scope.
+Compare `feature:` scopes by the bracketed paths, not the free description (see `references/file-formats.md`): a reworded feature materially covering the same paths is neither `never_audited` nor a new scope.
 
-Prioriser de façon déterministe, **matérialité d'abord, disponibilité du workload ensuite** :
+Prioritize deterministically, **materiality first, workload availability second**:
 
-1. matérialité forte, jamais audité ou chaud, workload sûr (versionné d'abord, sinon test/fixture/harness local crédible) ;
-2. matérialité forte, jamais audité ou chaud, workload long ou coûteux : proposer cette cible avec coût/durée estimés et demander confirmation — ne jamais l'écarter silencieusement au profit d'un candidat plus faible mais plus commode à mesurer ;
-3. matérialité forte, jamais audité ou chaud, sans workload connu : proposer la cible en demandant comment l'exercer ;
-4. matérialité moyenne, jamais audité ou chaud, workload sûr ;
-5. exposition indéterminable : jamais cible principale s'il reste un candidat 1-4 ; sinon proposer en énonçant l'information d'exposition manquante.
+1. high materiality, never audited or hot, safe workload (versioned first, otherwise a credible local test/fixture/harness);
+2. high materiality, never audited or hot, long or costly workload: propose this target with estimated cost/duration and request confirmation—never silently discard it for a weaker candidate that is easier to measure;
+3. high materiality, never audited or hot, no known workload: propose the target and ask how to exercise it;
+4. medium materiality, never audited or hot, safe workload;
+5. indeterminable exposure: never the primary target while a candidate from 1–4 remains; otherwise propose it while stating the missing exposure information.
 
-Écarter le rolling tant qu'un candidat 1-4 existe hors rolling. À niveau égal, préférer l'exposition sourcée la plus forte, puis l'ordre alphabétique du scope. Estimer l'exposition depuis des preuves ; ne jamais fabriquer une fréquence de production.
+Exclude the rolling window while any candidate 1–4 exists outside it. At the same level, prefer the strongest sourced exposure, then alphabetical scope order. Estimate exposure from evidence; never fabricate a production frequency.
 
-Un scope froid inchangé ne se re-sélectionne pas en auto : une mesure ne vieillit pas si ni le code, ni les données, ni l'environnement pertinent n'ont bougé. Il redevient candidat s'il passe `chaud`, sur demande explicite (path/feature), ou si l'utilisateur signale un changement d'environnement ou de dépendances justifiant une re-mesure.
+An unchanged cold scope is not automatically reselected: a measurement does not age when neither code, data, nor relevant environment has changed. It becomes a candidate again if it turns `hot`, on explicit request (path/feature), or when the user reports an environment or dependency change justifying remeasurement.
 
-Utiliser `selection:proposition` dans `references/templates.md` avec une cible principale, sa matérialité sourcée, jusqu'à deux alternatives, le workload et la métrique envisagés, et les scopes nouvellement écartés `exposure-capped`. **Attendre la validation utilisateur** avant la mesure.
+Use `selection:proposition` from `references/templates.md` with one primary target, its sourced materiality, up to two alternatives, proposed workload and metric, and newly excluded `exposure-capped` scopes. **Wait for user validation** before measurement.
 
-### Couverture matérielle atteinte
+### Material coverage reached
 
-Si aucun candidat 1-5 ne subsiste hors rolling — tout est capé, froid inchangé ou déjà couvert — ne pas auditer un scope immatériel pour occuper l'invocation. Utiliser `selection:coverage-stop` : récapituler les scopes capés avec leurs calculs et les froids inchangés, puis poser la question d'usage — *quelle opération te semble lente ?* — pont vers un audit `feature` ciblé. Écrire les éventuelles nouvelles lignes `skipped` ; ne rien écrire d'autre.
+If no candidate 1–5 remains outside the rolling window—everything is capped, unchanged cold, or already covered—do not audit an immaterial scope merely to fill the invocation. Use `selection:coverage-stop`: summarize capped scopes with their calculations and unchanged cold scopes, then ask the usage question—*which operation feels slow?*—as a bridge to a targeted `feature` audit. Write any new `skipped` lines; write nothing else.
 
-### Cas dégénérés
+### Degenerate cases
 
-- Aucun code exécutable ou workload identifiable : terminer avec `audit:inconclusive` et mémoriser l'inconclusif dans history.
-- Tous les candidats restants dans le rolling, capés ou froids inchangés : appliquer *Couverture matérielle atteinte*.
-- Repo non-git : ignorer le signal chaud/froid et annoncer la dégradation.
-- Commande estimée longue, coûteuse ou chargeante : demander confirmation avec coût/durée attendus avant exécution.
+- No executable code or identifiable workload: finish with `audit:inconclusive` and record the inconclusive result in history.
+- All remaining candidates are rolling, capped, or unchanged cold: apply *Material coverage reached*.
+- Non-Git repo: ignore the hot/cold signal and announce the degraded selection.
+- Command estimated to be long, costly, or load-generating: request confirmation with expected cost/duration before execution.
 
-## Audit ciblé par path
+## Path-targeted audit
 
-1. Vérifier que le path existe et appartient au projet.
-2. Lire intégralement les fichiers source du scope raisonnable, plus les call sites/tests/benchmarks nécessaires pour savoir comment l'exercer.
-3. Si le path dépasse un budget de lecture crédible ou contient plusieurs sous-systèmes indépendants, proposer 2-3 sous-scopes ; continuer sur tout le path seulement si l'utilisateur insiste.
-4. Identifier une opération qui exerce réellement le path. Ne pas benchmarker une fonction isolée si son coût n'est pas représentatif de son usage.
-5. Si plusieurs workloads sont plausibles et changeraient la conclusion, les présenter et demander lequel retenir.
-6. Un path explicitement demandé s'audite même si un triage antérieur l'a classé `exposure-capped` : rappeler le plafond attendu dans le plan de mesure — la mesure documentaire reste légitime sur demande.
+1. Verify the path exists and belongs to the project.
+2. Read all source files in the reasonable scope, plus the call sites/tests/benchmarks needed to know how to exercise it.
+3. If the path exceeds a credible reading budget or contains multiple independent subsystems, propose 2–3 subscopes; continue over the whole path only if the user insists.
+4. Identify an operation that actually exercises the path. Do not benchmark an isolated function if its cost does not represent its usage.
+5. If multiple workloads are plausible and would change the conclusion, present them and ask which to retain.
+6. An explicitly requested path is audited even if prior triage classified it `exposure-capped`: restate the expected ceiling in the measurement plan—documentary measurement remains legitimate on request.
 
-## Audit ciblé par feature
+## Feature-targeted audit
 
-1. Reformuler la feature en scénario observable, sans élargir l'intention.
-2. Localiser ses points d'entrée via routes, commandes, UI/API contracts, tests et recherche de symboles.
-3. Tracer les principaux call sites et le chemin de données jusqu'aux frontières I/O ; produire une liste de paths explicite.
-4. Identifier le test, benchmark ou scénario local qui exerce cette feature.
-5. Si le mapping feature → code ou workload reste ambigu, afficher le scope résolu et demander validation avant de mesurer.
-6. Conserver comme clé history `feature:<description-courte> [paths principaux]`. Si une ligne history couvre déjà matériellement les mêmes paths, réutiliser sa description exacte plutôt qu'une reformulation.
+1. Restate the feature as an observable scenario without broadening the intent.
+2. Locate entry points via routes, commands, UI/API contracts, tests, and symbol search.
+3. Trace main call sites and the data path to I/O boundaries; produce an explicit path list.
+4. Identify the test, benchmark, or local scenario exercising this feature.
+5. If the feature → code or workload mapping remains ambiguous, show the resolved scope and request validation before measurement.
+6. Keep `feature:<short-description> [main paths]` as the history key. If a history line already materially covers the same paths, reuse its exact description instead of rewording it.
 
-## Plan de mesure
+## Measurement plan
 
-Avant d'exécuter :
+Before execution:
 
-1. Définir le workload selon `references/doctrine.md > Contrat du workload`.
-2. Choisir une métrique primaire et au plus deux secondaires utiles.
-3. Si le triage a rattaché des hypothèses à la cible, définir pour chacune l'expérience minimale qui la falsifierait — la mesure teste des hypothèses, elle ne « regarde pas ce que ça donne ».
-4. Identifier un budget/SLO existant. S'il n'existe pas, ne pas en inventer ; définir ce qui constituerait une différence à la fois au-delà de la variance et matérielle au regard de l'exposition (l'ordre de grandeur de gain qui justifierait le changement), puis noter que la cible métier reste à préciser. Une acceptation réduite à « mieux que le bruit » ferait résoudre des gains immatériels.
-5. Choisir warmup, répétitions et statistique.
-6. Capturer une signature d'environnement courte : mode de build, versions runtime/toolchain pertinentes, OS/architecture ou conteneur/CI.
-7. Définir la commande de correction minimale à lancer avant/après si elle existe.
-8. Sanitiser toute commande destinée à l'état.
+1. Define the workload according to `references/doctrine.md > Workload contract`.
+2. Choose one primary metric and at most two useful secondary metrics.
+3. If triage attached hypotheses to the target, define the minimal experiment that would falsify each—measurement tests hypotheses; it does not "see what happens."
+4. Identify an existing budget/SLO. If none exists, do not invent one; define what would constitute a difference both beyond variance and material relative to exposure (the gain order of magnitude that would justify the change), then note that the business target remains to be specified. Acceptance reduced to "better than noise" would resolve immaterial gains.
+5. Choose warmup, repetitions, and statistic.
+6. Capture a short environment signature: build mode, relevant runtime/toolchain versions, OS/architecture or container/CI.
+7. Define the minimal correctness command to run before/after if one exists.
+8. Sanitize every command intended for state.
 
-Pour un audit auto, le plan fait partie de la proposition de cible. Pour un path/feature explicite, procéder directement si le workload est sûr, local et non ambigu ; sinon demander validation.
+For an auto audit, the plan is part of the target proposal. For an explicit path/feature, proceed directly if the workload is safe, local, and unambiguous; otherwise request validation.
 
-## Exécution
+## Execution
 
-1. Vérifier que le scénario fonctionne et que les tests de correction ciblés passent. Une erreur fonctionnelle n'est pas une mesure de performance valide.
-2. Exécuter le warmup puis la baseline avec répétitions suffisantes. Conserver valeurs agrégées et dispersion, pas seulement le meilleur run.
-3. Refaire un petit échantillon si les résultats sont instables. Si l'instabilité reste trop forte, conclure `inconclusif`.
-4. Profiler le même workload avec l'outil le plus pertinent disponible. Éviter que l'overhead du profiler ne soit comparé directement au temps non profilé.
-5. Relier les coûts dominants à des fichiers/lignes, requêtes, locks, allocations ou frontières I/O.
-6. Confronter les hypothèses du triage au profil : confirmées, réfutées ou remplacées par ce que la mesure révèle. Formuler pour chaque piste retenue une hypothèse falsifiable et une recommandation bornée ; ne pas implémenter pendant l'audit. Une hypothèse réfutée se consigne dans la ligne history — résultat à part entière, pas échec.
-7. Appliquer le garde-fou de maintenabilité de `references/doctrine.md`.
+1. Verify the scenario works and targeted correctness tests pass. A functional error is not a valid performance measurement.
+2. Run warmup, then the baseline with enough repetitions. Retain aggregate values and dispersion, not only the best run.
+3. Repeat a small sample if results are unstable. If instability remains too high, conclude `inconclusive`.
+4. Profile the same workload with the most relevant available tool. Avoid directly comparing profiler-overhead time with unprofiled time.
+5. Link dominant costs to files/lines, queries, locks, allocations, or I/O boundaries.
+6. Compare triage hypotheses with the profile: confirmed, refuted, or replaced by what measurement reveals. For each retained lead, formulate a falsifiable hypothesis and bounded recommendation; do not implement during the audit. Record a refuted hypothesis in the history line—a first-class result, not a failure.
+7. Apply the maintainability guardrail from `references/doctrine.md`.
 
-## Production et écriture des findings
+## Producing and writing findings
 
-Produire un finding seulement si toutes les conditions suivantes tiennent :
+Produce a finding only if all conditions hold:
 
-- workload explicite et reproductible ;
-- baseline chiffrée avec contexte de mesure ;
-- impact matériel par rapport à la dispersion, au budget ou à l'exposition ;
-- preuve localisant ou attribuant le coût ;
-- action locale crédible ;
-- compromis de maintenabilité/correction évalué.
+- explicit and reproducible workload;
+- quantified baseline with measurement context;
+- material impact relative to dispersion, budget, or exposure;
+- evidence localizing or attributing the cost;
+- credible local action;
+- evaluated maintainability/correctness tradeoff.
 
-Pour chaque finding :
+For each finding:
 
-1. Calibrer HIGH/MED/LOW via `references/doctrine.md`.
-2. Assigner le prochain ID `PERF-NNN` selon `references/file-formats.md`.
-3. Écrire le format Pending strict, avec workload et commandes sanitisés.
-4. Si un pending existant décrit même scope + métrique + bottleneck, ne pas dupliquer. Ajouter ou rafraîchir une section `Dernière observation (date)` et citer l'ID existant dans la sortie.
+1. Calibrate HIGH/MED/LOW via `references/doctrine.md`.
+2. Assign the next `PERF-NNN` ID according to `references/file-formats.md`.
+3. Write the strict Pending format, with sanitized workload and commands.
+4. If an existing pending finding describes the same scope + metric + bottleneck, do not duplicate it. Add or refresh a `Latest observation (date)` section and cite the existing ID in the output.
 
-Préfixer ensuite une ligne dans `performance_history.md` : findings, clean mesuré ou inconclusif. La parenthèse de résultat tient en une phrase courte — métrique dominante, raison d'immatérialité et hypothèses réfutées le cas échéant ; le récit détaillé n'appartient pas à history (cf. `references/file-formats.md`). Écrire au même moment les lignes `skipped` des scopes nouvellement capés au triage. Ne jamais trimmer l'historique.
+Then prepend a line to `performance_history.md`: findings, measured clean, or inconclusive. The result parenthetical is one short sentence—the dominant metric, reason for immateriality, and refuted hypotheses where applicable; detailed narrative does not belong in history (see `references/file-formats.md`). At the same time, write `skipped` lines for scopes newly capped during triage. Never trim history.
 
-## Sortie
+## Output
 
-- Findings produits : `audit:summary`.
-- Mesure valide sans bottleneck actionnable : `audit:clean`.
-- Preuve insuffisante ou workload impossible : `audit:inconclusive`.
-- Triage sans cible matérielle restante : `selection:coverage-stop`.
-- Avec findings, proposer un double-check via `audit:proposition`.
+- Findings produced: `audit:summary`.
+- Valid measurement without an actionable bottleneck: `audit:clean`.
+- Insufficient evidence or impossible workload: `audit:inconclusive`.
+- Triage with no remaining material target: `selection:coverage-stop`.
+- With findings, propose a double-check via `audit:proposition`.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-- Workload, métrique, baseline et environnement présents pour chaque finding.
-- Aucun finding dérivé d'un signal statique seul.
-- Cible auto sélectionnée par matérialité sourcée ; aucun scope `exposure-capped` choisi en auto.
-- Lignes `skipped` écrites pour les scopes nouvellement capés, dédupliquées contre les existantes.
-- Findings ajoutés en delta dans `## Pending` et compteur mis à jour, ou aucun si clean/inconclusif.
-- Une ligne history préfixée pour chaque audit exécuté ; hypothèses réfutées mentionnées dans la ligne clean.
-- Commandes persistées sanitisées.
-- Code source non modifié.
-- Résultat distingué explicitement entre `clean`, `inconclusif` et arrêt de triage sans audit.
+- Workload, metric, baseline, and environment present for every finding.
+- No finding derived from a static signal alone.
+- Auto target selected by sourced materiality; no `exposure-capped` scope selected automatically.
+- `skipped` lines written for newly capped scopes, deduplicated against existing ones.
+- Findings added as deltas under `## Pending` and counter updated, or none if clean/inconclusive.
+- A history line prepended for every executed audit; refuted hypotheses mentioned in the clean line.
+- Persisted commands sanitized.
+- Source code unmodified.
+- Result explicitly distinguished among `clean`, `inconclusive`, and triage stop without an audit.

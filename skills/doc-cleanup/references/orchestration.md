@@ -1,89 +1,89 @@
-# Orchestration & sécurité d'exécution
+# Orchestration & execution safety
 
-Référence chargée par `mode-project.md` (toujours) et `mode-zone.md` (si la zone est grosse). Décrit comment exécuter le nettoyage à grande échelle sans saturer le contexte ni casser le code via des renames inter-zones.
+Reference loaded by `mode-project.md` (always) and `mode-zone.md` (for a large zone). Describes large-scale cleanup without saturating context or breaking code through cross-zone renames.
 
-## Fan-out vs main-loop : quand déléguer
+## Fan-out vs main-loop: when to delegate
 
-Le nettoyage d'une zone tient-il dans le contexte courant ?
+Does a zone's cleanup fit in the current context?
 
-- **1 fichier, ou petit dossier (≲ 1500 LoC)** → **main-loop** directement. Pas de sous-agent : l'overhead d'orchestration dépasse le gain.
-- **Dossier moyen/gros, ou campagne multi-zones, avec sous-agents disponibles et autorisés** → **fan-out** : un sous-agent à contexte vierge par zone.
-- **Sous-agents indisponibles ou interdits par la session** → rester en **main-loop segmentée** : une zone à la fois, lectures ciblées, résumé structuré avant de libérer le contexte de travail et passer à la suivante. Ne jamais bloquer la campagne au seul motif que le runtime ne fournit pas de sous-agents.
+- **1 file or small directory (≲ 1500 LoC)** → direct **main-loop**. No subagent: orchestration overhead exceeds the benefit.
+- **Medium/large directory or multi-zone campaign, with subagents available and authorized** → **fan-out**: one fresh-context subagent per zone.
+- **Subagents unavailable or forbidden by the session** → stay in a **segmented main-loop**: one zone at a time, targeted reads, then a structured summary before releasing working context and moving to the next. Never block a campaign solely because the runtime provides no subagents.
 
-Le driver principal ne lit **jamais** le code de toutes les zones à la fois : il tient l'inventaire, le ledger de couverture et un **résumé** par zone. Avec délégation, chaque agent ne charge que sa zone ; sans délégation, la main-loop conserve la même discipline de lecture ciblée.
+The primary driver **never** reads every zone's code at once: it maintains the inventory, coverage ledger, and one **summary** per zone. With delegation, each agent loads only its zone; without it, the main-loop preserves the same targeted-reading discipline.
 
-## Stratégie par défaut : exécution sérialisée par zone
+## Default strategy: serialized execution by zone
 
-Modèle aligné sur l'intention « un agent par zone, puis on passe à la suivante » :
+Model aligned with “one agent per zone, then move to the next”:
 
-1. L'orchestrateur prend la **prochaine zone** non couverte de l'inventaire.
-2. Si la capacité existe, il **instancie un sous-agent** (contexte vierge) avec le briefing ci-dessous, scopé à cette zone. Sinon, il exécute lui-même la zone en main-loop segmentée avec le même briefing comme checklist.
-3. L'exécutant nettoie la zone (SUPPRIMER / RENOMMER / GARDER+dé-drifter), **grep le projet entier avant chaque rename** et met à jour tous les sites, puis produit un **résumé structuré**.
-4. L'orchestrateur **lance la validation** (cf. *Validation*). KO → stop, report, arbitrage utilisateur (pas de zone suivante). OK → écrit la ligne de couverture.
-5. Zone suivante.
+1. The orchestrator takes the inventory's **next uncovered zone**.
+2. If available, it **instantiates a subagent** (fresh context) with the briefing below, scoped to that zone. Otherwise, it executes the zone itself in a segmented main-loop using the same briefing as a checklist.
+3. The executor cleans the zone (DELETE / RENAME / KEEP+de-drift), **greps the entire project before each rename**, updates all sites, then produces a **structured summary**.
+4. The orchestrator **runs validation** (see *Validation*). KO → stop, report, user arbitration (no next zone). OK → write the coverage line.
+5. Next zone.
 
-**Sérialisé, pas parallèle** — c'est délibéré : un rename a un blast radius inter-zones. Deux agents qui mutent en parallèle se marchent dessus (un renomme un symbole que l'autre lit). La sérialisation garantit qu'à tout instant un seul agent écrit, et que chaque rename est propagé au projet entier avant la zone suivante.
+**Serialized, not parallel**—deliberately: a rename has a cross-zone blast radius. Two agents mutating in parallel interfere (one renames a symbol the other is reading). Serialization guarantees only one agent writes at any time and each rename propagates across the entire project before the next zone.
 
-### Variante parallèle (optionnelle, si le runtime la permet)
+### Parallel variant (optional, if the runtime permits)
 
-Si plusieurs sous-agents sont disponibles, que les zones sont très indépendantes et que les renames sont rares ou absents, on peut accélérer :
+If multiple subagents are available, zones are highly independent, and renames are rare or absent, acceleration is possible:
 
-- **Phase 1 — analyse R/O parallèle** : N agents lecture seule, un par zone, qui *proposent* (sans éditer) la liste des suppressions et des renames + leur blast radius. Sans danger (aucune mutation).
-- **Phase 2 — apply sérialisé** : l'orchestrateur applique zone par zone, en traitant les renames inter-zones en premier et de façon cohérente.
+- **Phase 1—parallel R/O analysis**: N read-only agents, one per zone, that *propose* (without editing) deletions and renames + their blast radius. Safe (no mutation).
+- **Phase 2—serialized apply**: the orchestrator applies changes zone by zone, processing cross-zone renames first and consistently.
 
-Ne prendre cette variante que si le gain de temps est réel ; sinon, la stratégie sérialisée par défaut est plus simple et plus sûre. (Isolation `worktree` par agent : possible mais overkill ici — réservée aux mutations vraiment concurrentes.)
+Use this variant only when time savings are real; otherwise the default serialized strategy is simpler and safer. (Per-agent `worktree` isolation is possible but overkill here—reserve it for truly concurrent mutations.)
 
-## Briefing d'un sous-agent de zone
+## Zone-subagent briefing
 
-Le sous-agent a un **contexte vierge** : il ne connaît ni la doctrine ni les règles. Le briefing doit être **auto-suffisant**. Template à remplir par l'orchestrateur :
+The subagent has **fresh context**: it knows neither doctrine nor rules. The briefing must be **self-contained**. Template for the orchestrator to fill in:
 
 ```
-Tu nettoies AGRESSIVEMENT la documentation de code d'UNE zone : <chemin de la zone>.
-Objectif : supprimer le bruit de commentaires, rendre le code auto-documenté, fiabiliser le reste. Comportement du code constant.
+You AGGRESSIVELY clean code documentation in ONE zone: <zone path>.
+Goal: delete comment noise, make code self-documenting, and make survivors reliable. Preserve behavior.
 
-RÈGLE CENTRALE : un commentaire qui décrit CE QUE le code fait ("what") est du bruit ~90% du temps → SUPPRIME. Un commentaire qui explique POURQUOI ("why" : logique métier, intention non-évidente) → GARDE. Dans le doute sur un "what", supprime.
+CORE RULE: a comment describing WHAT code does is noise ~90% of the time → DELETE. A comment explaining WHY (business logic, non-obvious intent) → KEEP. When uncertain about a “what,” delete it.
 
-3 actions possibles par commentaire/nom :
-1. SUPPRIMER à vue : paraphrase du code, narration étape par étape, bannières décoratives, docstring/JSDoc qui répète la signature et des types déjà typés, code commenté mort, TODO périmés, changelog en commentaire.
-2. RENOMMER pour supprimer : si un commentaire ne compense qu'un nom vague, renomme l'identifiant et supprime le commentaire. MAIS : pas de nom-fleuve illisible (sinon garde un commentaire court) ; grep est TEXTUEL et rate les usages dynamiques/reflection/homonymes — pour un symbole LOCAL/PRIVÉ, rename après grep désambiguïsé (frontières de mot) ; pour un rename CROSS-FICHIERS, utilise un outil sémantique (rename LSP/compilateur, ou find_referencing_symbols + rename_symbol) s'il existe, SINON ne renomme PAS (garde un commentaire court) ; ne renomme JAMAIS un symbole exporté / nom d'API publique / clé de sérialisation.
-3. GARDER + corriger : garde le "why" réel (métier, tradeoff, sécurité, limitation plateforme, contrat d'API publique) ET corrige son drift (rends-le conforme au comportement réel actuel ; vérifie ses affirmations par grep avant de les garder).
+3 possible actions per comment/name:
+1. DELETE on sight: code paraphrase, step-by-step narration, decorative banners, docstring/JSDoc repeating the signature and already declared types, dead commented-out code, stale TODOs, changelog comments.
+2. RENAME to delete: if a comment only compensates for a vague name, rename the identifier and delete the comment. BUT: no unreadable sentence-long name (otherwise keep a short comment); grep is TEXTUAL and misses dynamic uses/reflection/homonyms—for a LOCAL/PRIVATE symbol, rename after disambiguated grep (word boundaries); for a CROSS-FILE rename, use a semantic tool (LSP/compiler rename, or find_referencing_symbols + rename_symbol) if available; OTHERWISE do NOT rename (keep a short comment); NEVER rename an exported symbol/public API name/serialization key.
+3. KEEP + correct: keep genuine “why” (business, tradeoff, security, platform limitation, public API contract) AND correct its drift (match actual current behavior; grep its claims before keeping them).
 
-NE TOUCHE PAS : en-têtes de licence/copyright, directives à sémantique (eslint-disable, type: ignore, noqa, @ts-expect-error, pragmas), fichiers générés/vendored, contrats d'API publique (garde+corrige). Emoji = pas un critère.
+DO NOT TOUCH: license/copyright headers, semantic directives (eslint-disable, type: ignore, noqa, @ts-expect-error, pragmas), generated/vendored files, public API contracts (keep+correct). Emoji are not a criterion.
 
-GIT EN LECTURE SEULE : édite les fichiers, mais AUCUN git add/commit/push/reset/checkout. Laisse tout dans l'arbre de travail.
+READ-ONLY GIT: edit files, but NO git add/commit/push/reset/checkout. Leave everything in the worktree.
 
-Analyse transverse autorisée et encouragée : grep inter-fichiers pour vérifier l'impact d'un rename et la véracité des commentaires gardés.
+Cross-cutting analysis is allowed and encouraged: cross-file grep to verify rename impact and the truth of kept comments.
 
-RENVOIE un résumé structuré (et RIEN d'autre) :
-- fichiers inspectés : <liste ou compte>
-- commentaires supprimés : <N>
-- renames effectués : <liste "ancien → nouveau" + nb de sites mis à jour + outil utilisé (grep / sémantique)>
-- docs dé-driftées : <N> (+ 1 ligne par correction notable)
-- fichiers modifiés : <liste>
-- fichiers/sous-zones explicitement NON traités (et pourquoi) : <…>
-- points d'attention / incertitudes laissées en l'état : <…>
+RETURN a structured summary (and NOTHING else):
+- files inspected: <list or count>
+- comments deleted: <N>
+- renames performed: <list "old → new" + number of sites updated + tool used (grep / semantic)>
+- docs de-drifted: <N> (+ 1 line per notable correction)
+- files modified: <list>
+- files/subzones explicitly NOT processed (and why): <…>
+- attention points/uncertainties left unchanged: <…>
 ```
 
-Adapter : pour `--touched` (mode session), ajouter *« limite-toi aux lignes des hunks suivants : <hunks> »*. Pour la variante R/O, remplacer « édite » par « ne modifie rien, propose seulement ».
+Adapt: for `--touched` (session mode), add *“limit yourself to the lines in these hunks: <hunks>”*. For the R/O variant, replace “edit” with “modify nothing; only propose.”
 
-Utiliser un agent suffisamment capable pour le tri *what/why* et le jugement de rename. Ne pas supposer qu'un modèle nommé ou un niveau de service particulier est disponible.
+Use an agent capable enough for *what/why* classification and rename judgment. Do not assume a named model or particular service tier is available.
 
-## Vérification d'intégrité du résumé
+## Summary integrity verification
 
-Le résumé de zone n'est **pas auto-certifiant**, qu'il provienne d'un sous-agent ou de la main-loop : les tests prouvent que le code compile/passe, pas que la zone a été inspectée ni que l'exécutant n'a pas été timide. Avant d'écrire la couverture, celui qui drive **recoupe le résumé avec le diff réel** :
+The zone summary is **not self-certifying**, whether from a subagent or the main-loop: tests prove code compiles/passes, not that the zone was inspected or the executor was aggressive enough. Before writing coverage, the driver **cross-checks the summary against the actual diff**:
 
-- `git diff --stat -- <zone>` : cohérent avec le résumé (suppressions/renames annoncés → diff non vide ; `0 supprimés (déjà propre)` → diff vide attendu).
-- **Scope** : les fichiers du diff doivent rester **dans la zone**, **plus** les sites de propagation de rename hors-zone légitimement déclarés dans le résumé (un rename cross-fichiers fait *légitimement* déborder le diff — ne pas le traiter comme une anomalie). Un débordement **sans** rename déclaré = anomalie → investiguer.
-- Résumé manifestement incomplet (zone non triviale mais `fichiers inspectés` vide, ou diff vide alors que la zone est visiblement bruitée) → relancer l'agent si possible ou reprendre en main-loop ; **ne pas marquer couvert** sur la seule foi du résumé.
+- `git diff --stat -- <zone>`: consistent with the summary (declared deletions/renames → nonempty diff; `0 deleted (already clean)` → empty diff expected).
+- **Scope**: diff files must remain **inside the zone**, **plus** legitimate out-of-zone rename-propagation sites declared in the summary (a cross-file rename *legitimately* expands the diff—do not treat this as an anomaly). Overflow **without** a declared rename = anomaly → investigate.
+- Manifestly incomplete summary (non-trivial zone but empty `files inspected`, or empty diff while the zone is visibly noisy) → rerun the agent if possible or resume in the main-loop; **do not mark covered** based only on the summary.
 
 ## Validation
 
-Lancée par celui qui **drive** (orchestrateur ou main-loop), **après chaque zone entièrement appliquée** — jamais par edit (un rename n'est valide qu'une fois tous les sites mis à jour).
+Run by the **driver** (orchestrator or main-loop), **after each fully applied zone**—never per edit (a rename is valid only after every site is updated).
 
-Détection de la commande, opportuniste, dégradation gracieuse :
+Opportunistic command detection with graceful degradation:
 
-1. Détecter le runner : scripts `package.json` (`test`, `lint`, `typecheck`), cibles `Makefile` (`test`, `lint`, `check`), `cargo test`/`cargo check`, `go test ./...`/`go vet`, `pytest`/`tox`, `pyproject`/`ruff`, etc.
-2. **Ambigu ou plusieurs candidats** → demander **une fois** à l'utilisateur la commande de validation au début de la campagne, puis la réutiliser pour toutes les zones (ne pas redemander à chaque zone).
-3. **Rien de détecté** → l'annoncer (*"Pas de suite de tests détectée — validation en mode dégradé : compilation/lint seuls si dispo, sinon aucune."*) et continuer.
+1. Detect the runner: `package.json` scripts (`test`, `lint`, `typecheck`), `Makefile` targets (`test`, `lint`, `check`), `cargo test`/`cargo check`, `go test ./...`/`go vet`, `pytest`/`tox`, `pyproject`/`ruff`, etc.
+2. **Ambiguous or multiple candidates** → ask the user **once** for the validation command at campaign start, then reuse it for all zones (do not ask again per zone).
+3. **Nothing detected** → announce it (*"No test suite detected—degraded validation: compile/lint only if available; otherwise none."*) and continue.
 
-**Tests KO sur une zone** : git étant en lecture seule, pas de revert automatique. **Stop** : ne pas passer à la zone suivante, reporter l'échec et les fichiers concernés, laisser l'utilisateur arbitrer (corriger, ou revoir/annuler manuellement le diff de la zone).
+**Tests KO in a zone**: because git is read-only, do not auto-revert. **Stop**: do not proceed to the next zone; report the failure and affected files, and let the user arbitrate (fix, or manually review/revert the zone diff).

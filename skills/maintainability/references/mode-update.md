@@ -1,80 +1,80 @@
-# Mode : update
+# Mode: update
 
-Référence chargée par SKILL.md en mode **update**. **Pas d'audit nouveau.** Re-vérifie tous les pendings contre l'état actuel du code et met à jour les statuts. Les conventions transverses (date déterministe, écritures en delta) vivent dans SKILL.md et s'appliquent ici.
+Reference loaded by SKILL.md in **update** mode. **No new audit.** Re-verify all pending findings against current code and update statuses. The cross-cutting conventions (deterministic date, delta writes) live in SKILL.md and apply here.
 
-## Flux
+## Flow
 
-1. Lire `maintainability_findings.md`. Itérer sur chaque entrée de la section `## Pending`.
-2. Pour chaque finding :
-   a. Lire le fichier référencé en localisation.
-   b. **Si le fichier est introuvable** (déplacé, supprimé, renommé) — passer en **investigation self-heal** avant de conclure. Utiliser les outils à disposition selon le contexte (git history, lecture de diffs, recherche du pattern dans la codebase, cross-check avec history) ; pour `stale-after-<ID>`, le commit primaire est connu et fournit un signal direct. Trois issues :
-      - **Pattern retrouvé clairement à un nouvel emplacement** (signal fort : rename git ≥50% similarité, ou pattern unique retrouvé à 1 endroit avec match clair sur l'observation) → proposer la relocalisation 1-touch (*"`<ID>` retrouvé à `<new-path>:<line>` (<signal utilisé>). Relocaliser ?"*). Si OK : amender le titre avec le nouveau path, reset du `Status` à `pending`, puis re-vérifier le pattern au nouveau path comme à l'étape 2.c.
-      - **Pattern dissout** (suppression nette du pattern dans un commit identifiable, ou aucune trace ailleurs dans la codebase) → proposer marquer résolu (*"`<ID>` dissout par <commit / refactor>. Marquer résolu ?"*). Si OK : flux résolu standard (étape 3), `Resolution` cite le commit responsable si identifiable.
-      - **Signaux insuffisants ou ambigus** (pattern trop vague pour scanner, hits multiples non discriminants, fichiers au nom voisin créant un risque de faux positif, observation reposant sur du contexte humain) → marquer `Status: stale` (ou préserver `stale-after-<ID>` déjà posé par la cascade — l'info de cause reste plus précieuse), traité à l'étape 4.
+1. Read `maintainability_findings.md`. Iterate over each entry in `## Pending`.
+2. For each finding:
+   a. Read the file referenced by its location.
+   b. **If the file cannot be found** (moved, deleted, renamed)—enter **self-heal investigation** before concluding. Use available tools as context warrants (git history, diff reading, codebase pattern search, history cross-check); for `stale-after-<ID>`, the primary commit is known and provides a direct signal. Three outcomes:
+      - **Pattern clearly found at a new location** (strong signal: git rename ≥50% similarity, or unique pattern found at 1 location clearly matching the observation) → propose one-touch relocation (*"`<ID>` found at `<new-path>:<line>` (<signal used>). Relocate?"*). If approved: amend the title with the new path, reset `Status` to `pending`, then re-verify the pattern there as in step 2.c.
+      - **Pattern dissolved** (clear pattern deletion in an identifiable commit, or no trace elsewhere in the codebase) → propose marking resolved (*"`<ID>` dissolved by <commit / refactor>. Mark resolved?"*). If approved: standard resolved flow (step 3), citing the responsible commit in `Resolution` when identifiable.
+      - **Insufficient or ambiguous signals** (pattern too vague to scan, multiple non-discriminating hits, similarly named files risking a false positive, observation relying on human context) → mark `Status: stale` (or preserve a cascade-created `stale-after-<ID>`—causal information is more valuable), then handle at step 4.
       
-      **Seuil de confiance** : conclure seulement si le signal est fort — un fichier au nom voisin est le faux positif classique. En cas de doute, retomber sur le tagging stale. Le choix des outils et leur enchaînement reste à la main de l'agent ; le skill spécifie l'intention et les contraintes, pas la procédure.
+      **Confidence threshold**: conclude only on strong evidence—a similarly named file is the classic false positive. When uncertain, fall back to stale tagging. Tool choice and sequencing remain with the agent; the skill specifies intent and constraints, not procedure.
       
-      **Refus utilisateur sur une proposition self-heal** (no à relocaliser ou no à résoudre) → traité comme un stale standard à l'étape 4 (3 options manuelles). Le `Status` reste `stale` (ou `stale-after-<ID>` selon ce qui est applicable).
-   c. **Si le fichier existe** : vérifier que le pattern décrit dans l'observation est toujours présent à la localisation indiquée (ou nearby si les lignes ont bougé). Heuristique :
-      - Lire les ~20 lignes autour de la localisation.
-      - Si le pattern décrit (duplication, god file taille, etc.) est encore reconnaissable → status inchangé.
-      - Si le pattern a disparu → bascule en Resolved.
-      - **Finding multi-fichiers** (bullet `Localisation` listant plusieurs emplacements, typiquement issu d'un crosscut) : lire chacun, juger le pattern globalement. Pattern dissout sur tous les emplacements → Resolved. Pattern partiellement résolu (1 sur N occurrences clear, mais ≥ 2 restent) → status inchangé. Si seul reste 1 emplacement, traiter selon la dimension : `DUP` n'a plus de sens à 1 copie → Resolved ; `DRF`/`INC` peuvent persister à 1 emplacement si le drift / l'incohérence subsiste → status inchangé ; `ARC` (cycle, couplage) est résolu quand la **relation** structurelle est rompue (cycle cassé, dépendance inversée), pas quand un des fichiers change → juger sur la relation, pas sur les emplacements.
-3. Pour chaque résolu détecté :
-   - Déplacer l'entrée de `## Pending` vers `## Resolved` au **format compact** (cf. `references/file-formats.md > Format compact d'une entrée résolue`).
-   - Ajouter `(résolu YYYY-MM-DD)` au titre.
-   - La bullet `Resolution` indique `détecté résolu lors de update (YYYY-MM-DD). Δ LoC mesuré : <valeur>` (via `git log --since=<date> -- <fichier>` ou comparaison directe ; sinon `indéterminé`). Ajouter `Commit : <hash>` si un commit aval est identifiable.
-   - Mettre à jour la ligne history correspondante (l'audit qui a créé ce finding) : ajouter ou compléter le `(résolus <ID>+...)`.
-4. Pour chaque stale **non résolu par l'investigation self-heal** (générique ou `stale-after-<ID>` préservé) : laisser dans Pending. Le `Status` a déjà été ajusté à l'étape 2.b. Demander à l'utilisateur en chat — message adapté à la cause, et mentionnant brièvement pourquoi le self-heal n'a pas conclu :
-   - Stale générique : *"`<ID>` référence un fichier introuvable, investigation inconclusive (`<raison-courte>`). Rouvrir avec nouveau path, marquer résolu (le pattern n'existe plus), ou archiver ?"*
-   - Stale-after : *"`<ID>` est `stale-after-<ID-primaire>` depuis le fix du <YYYY-MM-DD>. Investigation inconclusive (`<raison-courte>`). Rouvrir avec nouveau path, marquer résolu, ou archiver ?"*
-   - **Escalade des stales anciens** (borne de terminaison à la boucle d'arbitrage) : comparer la date de pose du `Status: stale (...)` / `stale-after-<ID> (...)` à la date courante (`date +%F`). Si elle dépasse **90 jours**, ne plus re-proposer les trois options à égalité : basculer vers un **défaut explicite d'archivage** — *"`<ID>` est stale depuis le <date-de-pose> (> 90 j sans résolution). J'archive (NO-GO : stale non résolu) sauf objection ?"*. L'utilisateur peut toujours rouvrir/relocaliser ; le but est d'éviter qu'un stale jamais tranché pollue le board indéfiniment. Sans escalade, un stale resterait Pending éternellement.
-5. **Vérification de l'invariant cap Resolved** : compter les entrées de `## Resolved` après les moves. Si > 8, appliquer le flux d'archivage automatique (cf. `references/file-formats.md > Cycle de vie d'un finding` étape 5).
-6. **Recompute des compteurs d'IDs** : re-scanner `maintainability_findings.md` + `maintainability_resolved_archive.md` (s'il existe), recalculer le max par préfixe, mettre à jour le header `<!-- id_counters: ... -->`. Self-heal contre drift. **À l'occasion de ce re-scan, backfill des commits** : pour chaque bullet `Resolution` portant `Commit : non commité`, si un commit appliquant ce fix est identifiable **sans ambiguïté** (`git log` sur les fichiers cités, diff/message correspondant à la description), compléter le hash. Best effort — au moindre doute, laisser `non commité` (jamais de hash deviné).
-7. **Réconciliation history → findings (lecture seule, signalement only).** Les deux fichiers de l'étape 6 sont déjà chargés ; à ce moment, vérifier que chaque ID présent en `## Resolved`/archive apparaît bien dans un `(résolus <ID>+...)` d'une ligne history, et inversement qu'aucune ligne history ne marque résolu un ID encore dans `## Pending`. **Aucune écriture corrective automatique** : en cas d'incohérence (matching date+zone ambigu, `(résolus …)` oublié ou posé sur la mauvaise ligne), le **signaler en chat** (*"history incohérent : `<ID>` est résolu mais aucune ligne history ne le marque — à corriger à la main"*). `(résolus …)` est purement informatif (n'alimente aucune logique de sélection), donc un simple signalement suffit ; la source de vérité reste `findings.md`.
+      **User refusal of a self-heal proposal** (no to relocation or resolution) → treat as standard stale at step 4 (3 manual options). `Status` remains `stale` (or `stale-after-<ID>`, as applicable).
+   c. **If the file exists**: verify that the observation's pattern is still present at the stated location (or nearby if lines shifted). Heuristic:
+      - Read ~20 lines around the location.
+      - If the described pattern (duplication, god-file size, etc.) remains recognizable → status unchanged.
+      - If the pattern disappeared → move to Resolved.
+      - **Multi-file finding** (`Location` bullet listing several locations, typically from a crosscut): read each and assess the pattern globally. Pattern dissolved at all locations → Resolved. Partially resolved pattern (1 of N occurrences cleared, but ≥ 2 remain) → status unchanged. If only 1 location remains, handle by dimension: `DUP` no longer makes sense with 1 copy → Resolved; `DRF`/`INC` may persist at 1 location if drift/inconsistency remains → unchanged; `ARC` (cycle, coupling) resolves when the structural **relationship** is broken (cycle broken, dependency inverted), not when one file changes → judge the relationship, not locations.
+3. For each detected resolution:
+   - Move the entry from `## Pending` to `## Resolved` in **compact format** (see `references/file-formats.md > Compact resolved-entry format`).
+   - Add `(resolved YYYY-MM-DD)` to the title.
+   - `Resolution` states `detected resolved during update (YYYY-MM-DD). Measured Δ LoC: <value>` (via `git log --since=<date> -- <file>` or direct comparison; otherwise `indeterminate`). Add `Commit: <hash>` if a downstream commit is identifiable.
+   - Update the corresponding history line (the audit that created this finding): add or complete `(resolved <ID>+...)`.
+4. For each stale finding **not resolved by self-heal investigation** (generic or preserved `stale-after-<ID>`): leave in Pending. `Status` was already adjusted in step 2.b. Ask the user in chat—a message adapted to the cause, briefly stating why self-heal did not conclude:
+   - Generic stale: *"`<ID>` references a missing file; investigation was inconclusive (`<short-reason>`). Reopen with a new path, mark resolved (pattern no longer exists), or archive?"*
+   - Stale-after: *"`<ID>` has been `stale-after-<primary-ID>` since the YYYY-MM-DD fix. Investigation was inconclusive (`<short-reason>`). Reopen with a new path, mark resolved, or archive?"*
+   - **Escalate old stale entries** (termination bound for the arbitration loop): compare the date in `Status: stale (...)` / `stale-after-<ID> (...)` with the current date (`date +%F`). If older than **90 days**, stop offering the three options equally and switch to an **explicit archive default**—*"`<ID>` has been stale since <status-date> (> 90d unresolved). I will archive it (NO-GO: unresolved stale) unless you object."* The user may still reopen/relocate; this prevents an undecided stale entry from polluting the board indefinitely. Without escalation, it would remain Pending forever.
+5. **Verify the Resolved cap invariant**: count `## Resolved` entries after moves. If > 8, apply automatic archival (see `references/file-formats.md > Finding lifecycle` step 5).
+6. **Recompute ID counters**: rescan `maintainability_findings.md` + `maintainability_resolved_archive.md` (if present), recalculate each prefix maximum, update `<!-- id_counters: ... -->`. Self-heals drift. **During this rescan, backfill commits**: for each `Resolution` bullet with `Commit: uncommitted`, if a commit applying the fix is identifiable **unambiguously** (`git log` on cited files, diff/message matching the description), fill in the hash. Best effort—at the slightest doubt leave `uncommitted` (never guess a hash).
+7. **Reconcile history → findings (read-only, report only).** The two step 6 files are already loaded; verify that every ID in `## Resolved`/archive appears in a history-line `(resolved <ID>+...)`, and conversely that no history line marks an ID still in `## Pending` as resolved. **No automatic corrective write**: on inconsistency (ambiguous date+zone matching, forgotten `(resolved …)`, or placed on the wrong line), **report it in chat** (*"inconsistent history: `<ID>` is resolved but no history line marks it—correct manually"*). `(resolved …)` is informational only (it drives no selection logic), so reporting suffices; `findings.md` remains the source of truth.
 
-## Sortie
+## Output
 
-Utiliser le template `update:summary`.
+Use template `update:summary`.
 
-## Coût
+## Cost
 
-Lectures potentiellement nombreuses (une par pending, plus l'investigation self-heal par stale rencontré — proportionnelle aux stales, pas au total des pendings). Acceptable : invocation rare et explicite, pas appelée à chaque audit.
+Potentially many reads (one per pending finding, plus self-heal investigation per encountered stale—proportional to stale count, not all pending findings). Acceptable: rare, explicit invocation; not run on every audit.
 
-## Détection intra-session
+## In-session detection
 
-Indépendamment de la commande `update` explicite, **pendant la conversation qui suit un audit ou un double-check**, si l'utilisateur applique un fix qui résout un finding listé :
+Independently of explicit `update`, **during the conversation following an audit or double-check**, if the user applies a fix resolving a listed finding:
 
-1. Le skill **exécute la re-vérification en cascade en lecture seule** (cf. `references/cascade.md`), puis propose la confirmation batchée via le template `resolution:confirm` — primaire + cascadés + stale-after en un seul prompt. Si overlap = 0 (aucun autre pending sur les fichiers du diff) : le template gère la variante simple sans bloc cascade.
-2. Si l'utilisateur valide : applique le flux update sur le primaire (move Pending → Resolved, bullet `Resolution`, ligne history) **et** exécute les écritures cascade (cascade-resolved au format compact, stale-after taggés, lignes history complétées, cap Resolved respecté).
-3. **Confirmer en chat** via le template `resolution:done` — détaillant les écritures effectuées. Si push-back partiel à l'étape 1 (l'utilisateur a refusé certains items) : la sortie reflète seulement ce qui a été appliqué.
+1. The skill **runs the cascade re-check read-only** (see `references/cascade.md`), then proposes batched confirmation via `resolution:confirm`—primary + cascaded + stale-after in one prompt. If overlap = 0 (no other pending finding on diff files): the template uses the simple variant without a cascade block.
+2. If approved: apply the update flow to the primary (move Pending → Resolved, `Resolution` bullet, history line) **and** perform cascade writes (cascade-resolved in compact format, stale-after tags, completed history lines, Resolved cap respected).
+3. **Confirm in chat** via `resolution:done`, detailing completed writes. On partial pushback at step 1 (user refused some items), output only what was applied.
 
-Cette détection est **opportuniste, pas exhaustive**. Pour une re-vérification systématique après plusieurs fixes hors-session, l'utilisateur invoque le mode update.
+This detection is **opportunistic, not exhaustive**. For systematic re-verification after several out-of-session fixes, the user invokes update mode.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-Avant de rendre la main, valider (une case **non applicable** est considérée cochée ; cf. SKILL.md > *Invariants de fin de mode* pour la règle transverse).
+Before returning control, validate (a box **not applicable** is considered checked; see SKILL.md > *End-of-mode invariants* for the cross-cutting rule).
 
 ### Update
 
-- Chaque pending re-vérifié.
-- Résolus détectés déplacés vers `## Resolved` au format compact.
-- **Investigation self-heal exécutée** sur chaque pending dont le fichier est introuvable (cf. étape 2.b).
-- **Stales auto-relocalisés** (signal fort de rename / nouvel emplacement) : titre amendé avec le nouveau path, `Status` reset à `pending`, pattern re-vérifié au nouveau path.
-- **Stales auto-résolus** (pattern dissout, fix identifié) : déplacés vers `## Resolved` au format compact, `Resolution` cite le commit responsable si identifiable.
-- Stales non résolus par investigation taggés `Status: stale` ; `stale-after-<ID>` existants préservés (pas écrasés). L'utilisateur arbitre à l'étape 4. **Stales > 90 j escaladés** vers un défaut d'archivage proposé (cf. étape 4) plutôt que re-proposés à l'identique.
-- Lignes history correspondantes complétées (`(résolus <ID>+...)`).
-- Cap Resolved appliqué (archivage automatique si > 8).
-- Header `<!-- id_counters: ... -->` recomputed (self-heal en re-scannant findings + archive) ; `Commit : non commité` backfillés quand un commit est identifiable sans ambiguïté (étape 6).
-- **Réconciliation history → findings** exécutée en lecture seule (étape 7) ; toute incohérence signalée en chat (pas de correction auto).
+- Every pending finding re-verified.
+- Detected resolutions moved to `## Resolved` in compact format.
+- **Self-heal investigation run** on every pending finding whose file is missing (see step 2.b).
+- **Auto-relocated stale entries** (strong rename/new-location signal): title amended with the new path, `Status` reset to `pending`, pattern re-verified there.
+- **Auto-resolved stale entries** (pattern dissolved, fix identified): moved to `## Resolved` in compact format, `Resolution` cites the responsible commit if identifiable.
+- Stale findings unresolved by investigation tagged `Status: stale`; existing `stale-after-<ID>` preserved (not overwritten). User arbitrates at step 4. **Stale > 90d escalated** to a proposed archive default (see step 4), not offered identically again.
+- Matching history lines completed (`(resolved <ID>+...)`).
+- Resolved cap applied (automatic archival if > 8).
+- `<!-- id_counters: ... -->` header recomputed (self-heal by rescanning findings + archive); `Commit: uncommitted` backfilled when a commit is unambiguously identifiable (step 6).
+- **History → findings reconciliation** run read-only (step 7); all inconsistencies reported in chat (no automatic correction).
 
-### Résolution intra-session
+### In-session resolution
 
-Checklist du flux *Détection intra-session* ci-dessus (réutilisée par `references/mode-double-check.md` *Fix maintenant*, `references/mode-audit.md > I`, et `references/mode-list.md` `fix B<n>`) :
+Checklist for the *In-session detection* flow above (reused by `references/mode-double-check.md` *Fix now*, `references/mode-audit.md > I`, and `references/mode-list.md` `fix B<n>`):
 
-- Entrée déplacée Pending → Resolved au format compact.
-- Bullet `Resolution :` complète (description + Δ LoC mesuré + Commit).
-- `(résolu YYYY-MM-DD)` ajouté au titre.
-- Ligne history correspondante mise à jour.
-- Cascade re-check déclenchée si fix avec diff (cf. `references/cascade.md`).
-- Cap Resolved respecté.
+- Entry moved Pending → Resolved in compact format.
+- Complete `Resolution:` bullet (description + measured Δ LoC + Commit).
+- `(resolved YYYY-MM-DD)` added to title.
+- Matching history line updated.
+- Cascade re-check triggered for a fix with a diff (see `references/cascade.md`).
+- Resolved cap respected.

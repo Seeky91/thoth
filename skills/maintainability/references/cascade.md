@@ -1,59 +1,59 @@
-# Re-vérification en cascade
+# Cascade re-verification
 
-Référence chargée par SKILL.md quand un fix déclenche la cascade (résolution intra-session, ou `fix B<n>` depuis `list`). But : détecter et tenir à jour les findings dont la localisation chevauche le diff du fix sans relancer un `update` complet.
+Reference loaded by SKILL.md when a fix triggers the cascade (in-session resolution, or `fix B<n>` from `list`). Purpose: detect and update findings whose location overlaps the fix diff without rerunning a full `update`.
 
-**Pas de cascade dans ces cas** :
-- Moves NO-GO (pas de fix, pas de diff).
-- Résolutions issues de `update` (déjà exhaustif par construction).
+**No cascade in these cases**:
+- NO-GO moves (no fix, no diff).
+- Resolutions from `update` (already exhaustive by construction).
 
-### Algorithme
+### Algorithm
 
-1. **Capter les paths modifiés par le fix**, par ordre de préférence :
-   - **(a) La liste des fichiers que l'agent vient d'éditer** — le cas nominal : la cascade suit un fix intra-session, l'agent connaît exactement ce qu'il a touché.
-   - **(b) `git diff --name-only HEAD`** si la liste n'est plus fiable (fix appliqué plus tôt dans la conversation) — sur-approximation acceptable : elle peut inclure du WIP utilisateur étranger au fix, ce qui ajoute seulement quelques candidats re-checkés en lecture seule.
-   - **(c) `git show --name-only <hash>`** si le fix est déjà commité (le hash vient de la `Resolution`).
+1. **Capture paths changed by the fix**, in order of preference:
+   - **(a) The list of files the agent just edited**—the nominal case: the cascade follows an in-session fix, and the agent knows exactly what it touched.
+   - **(b) `git diff --name-only HEAD`** if the list is no longer reliable (fix applied earlier in the conversation)—acceptable over-approximation: it may include user WIP unrelated to the fix, which only adds a few read-only re-check candidates.
+   - **(c) `git show --name-only <hash>`** if the fix is already committed (the hash comes from `Resolution`).
    
-   Le fix **non commité est le cas normal** (le skill ne commit jamais lui-même, cf. SKILL.md > Conventions transverses) — il ne fait pas sauter la cascade. Pour des fixes batchés (plusieurs primaires dans le même turn) : union des paths sur tous les fixes.
+   An **uncommitted fix is normal** (the skill never commits itself; see SKILL.md > Cross-cutting conventions)—it does not disable the cascade. For batched fixes (several primaries in the same turn): union the paths across all fixes.
 
-2. **Filtrer les candidats** parmi `## Pending`, hors les primaires déjà déplacés. Un finding est candidat ssi **au moins un** de ses paths :
-   - matche exactement un path du diff, ou
-   - est descendant d'un dossier du diff, ou
-   - est ancêtre d'un path du diff (cas god file dont le contenu est splitté en sous-fichiers).
+2. **Filter candidates** from `## Pending`, excluding primaries already moved. A finding is a candidate iff **at least one** of its paths:
+   - exactly matches a diff path, or
+   - is a descendant of a diff directory, or
+   - is an ancestor of a diff path (god-file case where content is split into subfiles).
    
-   Pour un finding mono-fichier : "ses paths" = le path du titre. Pour un finding multi-fichiers (bullet `Localisation` énumérant plusieurs emplacements, typiquement issu d'un crosscut) : "ses paths" = tous les paths listés dans `Localisation`.
+   For a single-file finding: "its paths" = the title path. For a multi-file finding (`Location` bullet listing several locations, typically from a crosscut): "its paths" = every path listed in `Location`.
 
-   **Si zéro candidat** : sortie silencieuse, aucune écriture, aucun message en chat.
+   **If there are zero candidates**: silent exit, no write, no chat message.
 
-3. **Re-check par candidat** — réutilise la logique par-dimension du mode update (`references/mode-update.md`) : lire ~20 lignes autour de la localisation, vérifier si le pattern décrit est encore reconnaissable. Trois issues possibles :
-   - **Pattern toujours présent** → laisser pending. Si la ligne a shifté significativement, mettre à jour `path:line` dans le titre. Pas d'autre écriture.
-   - **Pattern absent** (fichier toujours là, observation ne tient plus) → cascade-resolved. Move vers `## Resolved` au format compact. Bullet `Resolution :` au format : *"résolu collatéralement par fix de `<ID-primaire>` (YYYY-MM-DD). Δ LoC mesuré : intégré dans `<ID-primaire>`. Commit : `<hash-primaire>`."* — pas de fragmentation du Δ, la valeur globale reste dans la `Resolution` du primaire ; le champ `Commit` est aligné sur celui du primaire (`non commité` si le primaire ne l'est pas — le cascadé n'a jamais son propre commit).
-   - **Fichier disparu / renommé** (path absent du repo après le fix) → laisser en pending et **remplacer** la bullet `Status` par `Status : stale-after-<ID-primaire> (YYYY-MM-DD) — localisation invalidée par le fix, à relocaliser ou archiver`. Pas de question synchrone.
+3. **Re-check each candidate**—reuse the per-dimension logic from update mode (`references/mode-update.md`): read ~20 lines around the location and verify whether the described pattern is still recognizable. Three outcomes:
+   - **Pattern still present** → leave pending. If the line shifted significantly, update `path:line` in the title. No other write.
+   - **Pattern absent** (file still exists, observation no longer holds) → cascade-resolved. Move to `## Resolved` in compact format. `Resolution:` bullet format: *"resolved collaterally by fix for `<primary-ID>` (YYYY-MM-DD). Measured Δ LoC: included in `<primary-ID>`. Commit: `<primary-hash>`."*—do not fragment Δ; the global value remains in the primary's `Resolution`; align `Commit` with the primary (`uncommitted` if the primary is uncommitted—the cascaded finding never has its own commit).
+   - **File missing / renamed** (path absent from the repo after the fix) → leave pending and **replace** the `Status` bullet with `Status: stale-after-<primary-ID> (YYYY-MM-DD) — location invalidated by the fix; relocate or archive`. Do not ask synchronously.
 
-4. **Mettre à jour `maintainability_history.md`** : pour chaque cascade-resolved, retrouver la zone et la date de l'audit d'origine via la bullet `Détecté` de l'entrée Pending (lue **avant** le move qui la drop) et compléter `(résolus <IDs>+...)` sur la ligne d'audit correspondante.
+4. **Update `maintainability_history.md`**: for each cascade-resolved finding, recover the original audit area and date from the Pending entry's `Detected` bullet (read **before** the move drops it) and complete `(resolved <IDs>+...)` on the matching audit line.
 
-5. **Appliquer l'invariant cap Resolved** (cf. `references/file-formats.md > Cycle de vie d'un finding` étape 5).
+5. **Apply the Resolved cap invariant** (see `references/file-formats.md > Finding lifecycle` step 5).
 
-### Confirmation utilisateur (flux intra-session)
+### User confirmation (in-session flow)
 
-Le flux intra-session existant (*"Ce fix résout DUP-007. Je marque comme résolu ?"*) est étendu : la cascade s'exécute en lecture seule **avant** le prompt, et son résultat est inclus dans le **même prompt** que la confirmation primaire. Le template `resolution:confirm` (cf. `references/templates.md`) gère les deux variantes (avec/sans cascade) en un format unifié.
+The existing in-session flow (*"This fix resolves DUP-007. Mark it resolved?"*) is extended: the cascade runs read-only **before** the prompt, and its result is included in the **same prompt** as primary confirmation. Template `resolution:confirm` (see `references/templates.md`) handles both variants (with/without cascade) in a unified format.
 
-L'utilisateur valide tout en un mot. Si push-back partiel (*"garde INC-008 en pending"*) : appliquer le reste, ne pas insister.
+The user approves everything with one word. On partial pushback (*"keep INC-008 pending"*): apply the rest; do not insist.
 
-### Sortie en chat (flux pré-validés)
+### Chat output (pre-approved flows)
 
-Les flux `fix B<n>` (mode list) ont déjà un OK explicite avant exécution. La cascade s'exécute alors **sans nouveau prompt** ; son résultat agrégé est intégré au récap final via le template `cascade:recap-batch` (cf. SKILL.md > Sorties chat — conventions, et `references/templates.md`). Si overlap = 0 sur tous les fixes du batch : la ligne `Cascade re-check :` est omise.
+`fix B<n>` flows (list mode) already have explicit approval before execution. The cascade therefore runs **without a new prompt**; its aggregated result is included in the final recap via template `cascade:recap-batch` (see SKILL.md > Chat-output conventions, and `references/templates.md`). If overlap = 0 across all batch fixes, omit the `Cascade recheck:` line.
 
 ### Edge cases
 
-- **Cascade qui résout un autre item du batch en cours** (cas `fix B<n>`) : si le re-check post-fix de l'item #1 résout DUP-008 et que DUP-008 est l'item #2 du batch → skip DUP-008 dans la suite avec annonce *"DUP-008 déjà résolu collatéralement par DUP-007, skip."*
-- **`update` rencontre un `stale-after-<ID>` existant** : passe par l'investigation self-heal (cf. `references/mode-update.md > étape 2.b`) — le commit primaire est connu, signal direct. Trois issues possibles : auto-relocalisation (pattern retrouvé ailleurs), auto-résolution (pattern dissout par le fix primaire), ou préservation du tag `stale-after-<ID>` si l'investigation est inconclusive. Dans ce dernier cas, **ne pas remplacer** par un `stale` générique — l'info de cause reste plus précieuse.
+- **Cascade resolves another item in the active batch** (`fix B<n>` case): if post-fix re-check for item #1 resolves DUP-008 and DUP-008 is batch item #2 → skip DUP-008 later with *"DUP-008 already resolved collaterally by DUP-007; skipping."*
+- **`update` encounters an existing `stale-after-<ID>`**: use the self-heal investigation (see `references/mode-update.md > step 2.b`)—the primary commit is known, a direct signal. Three outcomes: auto-relocation (pattern found elsewhere), auto-resolution (pattern dissolved by the primary fix), or preserve `stale-after-<ID>` if investigation is inconclusive. In the last case, **do not replace** it with generic `stale`—causal information is more valuable.
 
-### Idempotence et borne de coût
+### Idempotence and cost bound
 
-- Idempotent : re-runner la cascade sur le même commit ne re-bouge rien (les cascadés sont déjà dans Resolved, le filtre à l'étape 2 les exclut).
-- Coût : ∝ |pendings ∩ overlap diff|, pas |pendings|. ≤ ~20 lignes lues par candidat (le re-check par-dim borne lui-même).
-- Aucun coût si overlap zéro (filtrage tôt à l'étape 2, sortie silencieuse à l'étape 3).
+- Idempotent: rerunning the cascade on the same commit moves nothing again (cascaded entries are already Resolved; the step 2 filter excludes them).
+- Cost: ∝ |pendings ∩ diff overlap|, not |pendings|. ≤ ~20 lines read per candidate (the per-dimension re-check is itself bounded).
+- Zero cost when overlap is zero (early filtering at step 2, silent exit at step 3).
 
-### Distinction avec le mode update
+### Difference from update mode
 
-`update` est exhaustif et explicite — l'utilisateur le lance pour rattraper des fixes hors-session. La cascade est **ciblée et automatique** — elle couvre les fixes faits dans la conversation courante. Les deux cohabitent : la cascade limite la dérive intra-session, `update` ratisse plus large quand la dérive a échappé.
+`update` is exhaustive and explicit—the user runs it to catch up with out-of-session fixes. The cascade is **targeted and automatic**—it covers fixes made in the current conversation. Both coexist: the cascade limits in-session drift; `update` sweeps more broadly when drift escaped it.

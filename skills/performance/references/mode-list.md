@@ -1,29 +1,29 @@
-# Mode : list
+# Mode: list
 
-Référence chargée en mode **list**. Lecture seule stricte : ne pas mesurer, ne pas re-profiler et ne rien écrire.
+Reference loaded in **list** mode. Strictly read-only: do not measure, re-profile, or write anything.
 
-## Flux
+## Flow
 
-1. Lire `performance_findings.md` et `performance_history.md` s'ils existent.
-2. Compter les Pending par sévérité et résumer pour chacun : ID, axe, scope, métrique/baseline et observation courte.
-3. Lister séparément les `stale` et `blocked`, tout en les gardant dans le total Pending.
-4. Lister les résolutions des 30 derniers jours depuis la section `## Resolved`. Ne pas charger l'archive ; si les 8 entrées du cap sont toutes dans la fenêtre, signaler que la vue peut être tronquée.
-5. Afficher le rolling des N dernières scopes auditées (`N=4`, ou override `<!-- rolling_size: N -->`) ; les lignes `skipped` n'y comptent pas. Mentionner sur une ligne les scopes `skipped (exposure-capped)` présents dans l'history, avec leur calcul.
-6. Recommander au plus un prochain geste :
-   - finding HIGH/MED sans Double-check, baseline la plus récente d'abord → `double-check <ID>` ;
-   - sinon finding GO déjà double-checké → reprendre son fix ;
-   - sinon stale/blocked → `update` ou rétablir le workload manquant ;
-   - zéro pending → nouvel audit.
+1. Read `performance_findings.md` and `performance_history.md` if they exist.
+2. Count Pending findings by severity and summarize for each: ID, axis, scope, metric/baseline, and brief observation.
+3. List `stale` and `blocked` separately while keeping them in the total Pending count.
+4. List resolutions from the last 30 days from `## Resolved`. Do not load the archive; if all 8 capped entries are within the window, report that the view may be truncated.
+5. Show the rolling window of the last N audited scopes (`N=4`, or override `<!-- rolling_size: N -->`); `skipped` lines do not count. On one line, mention `skipped (exposure-capped)` scopes present in history, with their calculation.
+6. Recommend at most one next action:
+   - HIGH/MED finding without a Double-check, most recent baseline first → `double-check <ID>`;
+   - otherwise an already double-checked GO finding → resume its fix;
+   - otherwise stale/blocked → `update` or restore the missing workload;
+   - zero pending → new audit.
 
-Utiliser `list:dashboard` dans `references/templates.md`.
+Use `list:dashboard` from `references/templates.md`.
 
-## Projet sans état
+## Project without state
 
-Ne pas bootstrapper. Annoncer : `Aucun audit de performance sur ce projet. Invoque performance en audit auto, path ou feature pour commencer.`
+Do not bootstrap. Announce: `No performance audit exists for this project. Invoke performance in auto, path, or feature audit mode to begin.`
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-- Aucun fichier projet ou état modifié.
-- Aucune commande de benchmark/profiling exécutée.
-- Stale/blocked distingués des pendings actionnables.
-- Recommandation fondée uniquement sur l'état lu, sans nouvelle conclusion technique.
+- No project or state file modified.
+- No benchmark/profiling command executed.
+- Stale/blocked distinguished from actionable pending findings.
+- Recommendation based only on read state, without a new technical conclusion.

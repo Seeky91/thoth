@@ -6,129 +6,129 @@ description: "Audit, track, deep-check, and resolve code maintainability debt: d
 
 # Maintainability skill
 
-## Frontière
+## Boundary
 
-Diagnostiquer et suivre la maintenabilité sans modifier le code audité pendant l'audit. **Le skill audite et suit d'abord** (findings persistants à IDs stables) ; il ne modifie le code qu'ensuite, sur résolution explicite après ta confirmation (`update`, `fix B<n>`) — ce n'est pas un refactoring one-shot. Ne pas utiliser pour la sécurité, la performance, l'accessibilité ou le choix de stack.
+Diagnose and track maintainability without modifying audited code during the audit. **The skill audits and tracks first** (persistent findings with stable IDs); it modifies code only afterward, through explicit resolution after your confirmation (`update`, `fix B<n>`)—this is not a one-shot refactor. Do not use for security, performance, accessibility, or stack selection.
 
-**Exception d'orchestration :** une invocation explicite du skill `maintainability-cycle` vaut confirmation bornée en amont pour ses choix de zone/dimension, ses batches, les fixes de ses verdicts GO et l'archivage des verdicts NO-GO sans scénario crédible de réévaluation. Dans ce cadre seulement, les propositions et plans des playbooks deviennent des annonces d'avancement plutôt que des gates ; toutes les autres règles, validations et limites Git restent inchangées.
+**Orchestration exception:** explicit invocation of `maintainability-cycle` constitutes bounded advance confirmation for its area/dimension choices, batches, fixes for GO verdicts, and archival of NO-GO verdicts with no credible reevaluation scenario. Only in that context do playbook proposals and plans become progress announcements instead of gates; all other rules, validations, and Git limits remain unchanged.
 
-## Références
+## References
 
-Ce SKILL.md est un **routeur mince** : il fixe le mode, les conventions transverses et la doctrine, puis renvoie vers le playbook du mode. Les détails normatifs vivent dans `references/`, chargées **à la demande** (un mode ne paie pas le contexte des autres) :
+This SKILL.md is a **thin router**: it sets the mode, cross-cutting conventions, and doctrine, then routes to the mode playbook. Normative details live in `references/`, loaded **on demand** (one mode does not pay the context cost of others):
 
-**Playbooks de mode** (un par mode — lire et exécuter celui du mode courant) :
+**Mode playbooks** (one per mode—read and execute the current mode's playbook):
 
-- `references/mode-audit.md` — inventaire des zones, sélection auto, exécution de l'audit, proposition de double-check autonome, action post-proposition batch.
-- `references/mode-crosscut.md` — sélection de la dimension transverse, sweep whole-project, proposition post-crosscut.
-- `references/mode-list.md` — tableau de bord lecture seule, détection des batches groupables.
-- `references/mode-update.md` — re-vérification des pendings, self-heal des stales, détection intra-session, invariants *Résolution intra-session*.
-- `references/mode-double-check.md` — deep-dive d'un finding (blast radius, faisabilité, verdict).
-- `references/mode-archive-clear.md` — purge de l'archive des résolus.
+- `references/mode-audit.md`—area inventory, automatic selection, audit execution, autonomous double-check proposal, post-batch-proposal action.
+- `references/mode-crosscut.md`—cross-cutting dimension selection, whole-project sweep, post-crosscut proposal.
+- `references/mode-list.md`—read-only dashboard, detection of groupable batches.
+- `references/mode-update.md`—pending re-verification, stale self-heal, in-session detection, *In-session resolution* invariants.
+- `references/mode-double-check.md`—deep dive into a finding (blast radius, feasibility, verdict).
+- `references/mode-archive-clear.md`—resolved-archive purge.
 
-**Doctrine et formats** (chargées quand on produit un finding ou écrit l'état) :
+**Doctrine and formats** (loaded when producing a finding or writing state):
 
-- `references/file-formats.md` — format des trois fichiers d'état (`maintainability_history.md`, `maintainability_findings.md`, `maintainability_resolved_archive.md`), compteur d'IDs, cycle de vie d'un finding, cap Resolved.
-- `references/cascade.md` — algorithme détaillé de la re-vérification en cascade post-fix.
-- `references/templates.md` — templates normatifs des sorties chat (un par usage, e.g. `audit:summary`, `list:dashboard`, `resolution:confirm`). **Lire avant chaque sortie chat** d'un mode pour garder la forme stable d'une invocation à l'autre.
-- `references/dimensions.md` — catalogue des 12 dimensions seed (`DUP`, `CPX`, `SIZ`, `DED`, `INC`, `IDM`, `BND`, `DRF`, `TST`, `CFG`, `DOC`, `ARC`), frontières entre dimensions voisines, outils de détection opportunistes, référentiel paradigmatique (évaluation multi-paradigme), et cadrages des dimensions `IDM`, `ARC` et `CPX`. **Lire avant la production d'un finding** quand le préfixe ou le cadrage de la dimension n'est pas immédiatement évident.
-- `references/quality.md` — grille de sévérité (HIGH/MED/LOW), garde-fous anti-bruit (*"Quand ne PAS produire de finding"*), et convention `Δ LoC`. **Lire avant la production d'un finding** : ces calibrations conditionnent la décision même d'écrire ou pas.
+- `references/file-formats.md`—format of the three state files (`maintainability_history.md`, `maintainability_findings.md`, `maintainability_resolved_archive.md`), ID counters, finding lifecycle, Resolved cap.
+- `references/cascade.md`—detailed post-fix cascade re-verification algorithm.
+- `references/templates.md`—normative chat-output templates (one per use, e.g. `audit:summary`, `list:dashboard`, `resolution:confirm`). **Read before every mode chat output** to keep form stable across invocations.
+- `references/dimensions.md`—catalog of 12 seed dimensions (`DUP`, `CPX`, `SIZ`, `DED`, `INC`, `IDM`, `BND`, `DRF`, `TST`, `CFG`, `DOC`, `ARC`), boundaries between adjacent dimensions, opportunistic detection tools, paradigmatic frame of reference (multi-paradigm evaluation), and framing for `IDM`, `ARC`, and `CPX`. **Read before producing a finding** when the prefix or dimension framing is not immediately obvious.
+- `references/quality.md`—severity scale (HIGH/MED/LOW), anti-noise guardrails (*"When NOT to produce a finding"*), and `Δ LoC` convention. **Read before producing a finding**: these calibrations determine whether to write one at all.
 
-## Dispatch des modes
+## Mode dispatch
 
-Déduire le mode de la requête utilisateur, indépendamment de la syntaxe d'invocation de l'agent :
+Infer the mode from the user's request, independently of agent invocation syntax:
 
-| Intention de la requête | Mode | Playbook | Entrée attendue |
+| Request intent | Mode | Playbook | Expected input |
 |---|---|---|---|
-| Afficher le tableau de bord | **list** | `references/mode-list.md` | Aucune ; lecture seule. |
-| Re-vérifier les pendings | **update** | `references/mode-update.md` | Aucune. |
-| Vérifier en profondeur un finding | **double-check** | `references/mode-double-check.md` | ID tel que `DUP-007`. |
-| Purger l'archive | **archive-clear** | `references/mode-archive-clear.md` | `--all`, `--keep N`, `--older-than <dur>` ou défaut > 6 mois. |
-| Auditer un chemin fourni | **audit forcé** | `references/mode-audit.md` | Chemin existant. |
-| Auditer sans chemin | **audit auto** | `references/mode-audit.md` | Inventorier, proposer une zone, la faire valider, puis auditer. |
-| Balayer une dimension transverse | **crosscut** | `references/mode-crosscut.md` | Dimension proposée parmi `DUP`, `INC`, `DRF`, `DED`, `BND`, `ARC`. |
+| Show the dashboard | **list** | `references/mode-list.md` | None; read-only. |
+| Re-verify pending findings | **update** | `references/mode-update.md` | None. |
+| Deep-check a finding | **double-check** | `references/mode-double-check.md` | ID such as `DUP-007`. |
+| Purge the archive | **archive-clear** | `references/mode-archive-clear.md` | `--all`, `--keep N`, `--older-than <dur>`, or default > 6 months. |
+| Audit a supplied path | **forced audit** | `references/mode-audit.md` | Existing path. |
+| Audit without a path | **automatic audit** | `references/mode-audit.md` | Inventory, propose an area, obtain approval, then audit. |
+| Sweep a cross-cutting dimension | **crosscut** | `references/mode-crosscut.md` | Proposed dimension among `DUP`, `INC`, `DRF`, `DED`, `BND`, `ARC`. |
 
-Accepter comme aliases de compatibilité `/maintainability`, `/maintainability-list`, `/maintainability-update`, `/maintainability-double-check`, `/maintainability-archive-clear` et `/maintainability-crosscut`. Avec Codex, utiliser le texte qui accompagne `$maintainability` pour choisir le même mode. Si le skill est invoqué explicitement sans précision, choisir **audit auto**.
+Accept compatibility aliases `/maintainability`, `/maintainability-list`, `/maintainability-update`, `/maintainability-double-check`, `/maintainability-archive-clear`, and `/maintainability-crosscut`. With Codex, use the text accompanying `$maintainability` to select the same mode. If explicitly invoked without details, choose **automatic audit**.
 
-**Procédure de dispatch** : (1) vérifier le root projet ; (2) résoudre `<STATE_DIR>` ; (3) valider l'entrée restante de la requête — demander une clarification uniquement pour un ID invalide, un chemin inexistant ou un flag inconnu ; (4) lire et exécuter le playbook du mode. Ne jamais dépendre d'une variable propre à un agent telle que `$ARGUMENTS`.
+**Dispatch procedure**: (1) verify the project root; (2) resolve `<STATE_DIR>`; (3) validate remaining request input—ask for clarification only for an invalid ID, nonexistent path, or unknown flag; (4) read and execute the mode playbook. Never depend on agent-specific variables such as `$ARGUMENTS`.
 
-## Détection du root projet
+## Project-root detection
 
-Avant tout dispatch de mode, le skill confirme que `cwd` est la racine d'un projet :
+Before dispatching any mode, confirm that `cwd` is a project root:
 
-1. Cherche un des marqueurs suivants dans le `cwd` : `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/`, `.svn/`.
-2. **Si trouvé** → continue.
-3. **Si absent**, remonter dans les parents jusqu'à trouver un marqueur (ou la racine du filesystem).
-4. **Si trouvé dans un parent** : annoncer *"Le root projet semble être `<chemin-parent>`, mais le `cwd` est `<cwd>`. Relance depuis `<chemin-parent>` ou confirme l'opération ici (l'état sera créé dans le projet confirmé)."* et attendre.
-5. **Si aucun marqueur trouvé nulle part** : abort avec *"Aucun marqueur de projet détecté (.git, package.json, pyproject.toml, …). Lance la commande depuis la racine d'un projet."*
+1. Look for one of these markers in `cwd`: `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/`, `.svn/`.
+2. **If found** → continue.
+3. **If absent**, walk up parent directories until a marker or filesystem root.
+4. **If found in a parent**: report *"The project root appears to be `<parent-path>`, but `cwd` is `<cwd>`. Rerun from `<parent-path>` or confirm the operation here (state will be created in the confirmed project)."* and wait.
+5. **If no marker is found anywhere**: abort with *"No project marker detected (.git, package.json, pyproject.toml, …). Run the command from a project root."*
 
-Ce check ne s'applique pas si l'utilisateur passe un `<path>` en argument (absolu, ou relatif résolu vs `cwd`) — dans ce cas, le path lui-même est le scope et l'état est rattaché au marqueur de root le plus proche du path.
+This check does not apply when the user passes a `<path>` argument (absolute, or relative resolved against `cwd`)—then the path itself is the scope and state attaches to the nearest root marker above it.
 
-## Répertoire d'état
+## State directory
 
-`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, partagé entre Claude Code et Codex. Le créer uniquement lorsqu'un mode doit écrire — le mode `list` ne crée aucun répertoire.
+`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, shared by Claude Code and Codex. Create it only when a mode must write—`list` creates no directory.
 
-Dans toutes les références de ce skill, un nom de fichier d'état non qualifié tel que `maintainability_findings.md` désigne toujours `<STATE_DIR>/maintainability_findings.md`.
+Throughout this skill, an unqualified state filename such as `maintainability_findings.md` always means `<STATE_DIR>/maintainability_findings.md`.
 
-## Conventions transverses (tout mode qui écrit l'état)
+## Cross-cutting conventions (every state-writing mode)
 
-Trois règles s'appliquent à **chaque** écriture des fichiers d'état, quel que soit le mode. Elles ne sont pas répétées dans chaque playbook — elles sont supposées partout.
+Three rules apply to **every** state-file write, regardless of mode. They are not repeated in each playbook—they apply everywhere.
 
-1. **Date courante déterministe.** Toute date `YYYY-MM-DD` écrite dans l'état (ligne history, `Détecté:`, `(résolu …)`, section `Double-check (…)`, `Status: stale (…)`) ou comparée à une date stockée (seuil « > 6 mois » d'`archive-clear`) doit être obtenue via `date +%F`, **jamais supposée de mémoire**. Si l'environnement ne permet pas d'exécuter `date` : le signaler en chat plutôt que d'inventer une date.
+1. **Deterministic current date.** Every `YYYY-MM-DD` date written to state (history line, `Detected:`, `(resolved …)`, `Double-check (…)` section, `Status: stale (…)`) or compared with a stored date (`archive-clear` threshold "> 6 months") must come from `date +%F`, **never from memory**. If the environment cannot run `date`, report it in chat rather than inventing a date.
 
-2. **Écritures en delta, jamais de régénération.** Les modes lisent l'état tôt et écrivent tard. Avant d'écrire `maintainability_findings.md` ou `maintainability_history.md`, **relire le fichier juste avant l'écriture**, puis **insérer / déplacer uniquement le(s) bloc(s) ciblé(s)** (le nouveau finding, la ligne history préfixée, le move Pending → Resolved). Ne **jamais** régénérer le fichier entier de mémoire : cela peut perdre des entrées existantes et écraser une édition manuelle faite entre-temps (le skill assume explicitement l'édition humaine de ces fichiers, cf. `references/file-formats.md`).
+2. **Delta writes, never regeneration.** Modes read state early and write late. Before writing `maintainability_findings.md` or `maintainability_history.md`, **reread the file immediately before the write**, then **insert/move only the targeted block(s)** (new finding, prepended history line, Pending → Resolved move). **Never** regenerate the entire file from memory: this may lose existing entries and overwrite an intervening manual edit (the skill explicitly supports human editing; see `references/file-formats.md`).
 
-3. **Git : l'arbre de travail se modifie, l'historique jamais.** Les flux de fix (résolution intra-session, `fix B<n>`, quick-wins post double-check) éditent librement les fichiers du projet, mais ne font **jamais** de `git add`/`commit`/`push` — le commit appartient à l'utilisateur (`git log`/`diff`/`show`/`blame` restent libres). Conséquence assumée : au moment où une résolution s'écrit, le fix est **normalement non commité** — la bullet `Resolution` porte alors `Commit : non commité` (cf. `references/file-formats.md`), complétable plus tard par `update`. La cascade post-fix ne dépend pas non plus d'un commit (cf. `references/cascade.md`).
+3. **Git: modify the worktree, never history.** Fix flows (in-session resolution, `fix B<n>`, post-double-check quick wins) freely edit project files but **never** run `git add`/`commit`/`push`—committing belongs to the user (`git log`/`diff`/`show`/`blame` remain allowed). Consequently, when resolution is written the fix is **normally uncommitted**—the `Resolution` bullet then states `Commit: uncommitted` (see `references/file-formats.md`), which `update` may fill later. The post-fix cascade also does not depend on a commit (see `references/cascade.md`).
 
-## Doctrine d'évaluation
+## Evaluation doctrine
 
-Trois cadrages normatifs vivent dans `references/` (descriptifs complets dans *Références* ci-dessus) et **doivent être consultés au moment de produire un finding** :
+Three normative frameworks live in `references/` (fully described under *References*) and **must be consulted when producing a finding**:
 
-- `references/dimensions.md` — dimensions, frontières, référentiel paradigmatique, cadrages `IDM`/`ARC`/`CPX`, hors-scope, outils. Préfixes inédits autorisés (3 lettres) si un problème réel ne colle à aucune dimension.
-- `references/quality.md > Grille de sévérité` — HIGH/MED/LOW = impact × exposition ; sévérité mutable (reclassable au double-check, ID conservé).
-- `references/quality.md > Quand ne PAS produire de finding` — contrepoids au biais structurel de sur-production : une zone à 0 finding est un audit *réussi*, trade-off check obligatoire en amont, garde-fou *Dogme ≠ défaut* sur les dimensions de jugement (`ARC`, `IDM`, `CPX`).
-- `references/quality.md > Estimation Δ LoC` — convention `~±N`, méthode d'estimation, raffinement au double-check, mesure réelle à la résolution.
+- `references/dimensions.md`—dimensions, boundaries, paradigmatic frame, `IDM`/`ARC`/`CPX` framing, exclusions, tools. New 3-letter prefixes are allowed when a real issue fits no dimension.
+- `references/quality.md > Severity scale`—HIGH/MED/LOW = impact × exposure; mutable severity (reclassifiable at double-check, ID retained).
+- `references/quality.md > When NOT to produce a finding`—counterweight to structural overproduction bias: 0 findings is a *successful* audit, mandatory upstream trade-off check, *Dogma ≠ defect* guardrail for judgment dimensions (`ARC`, `IDM`, `CPX`).
+- `references/quality.md > Δ LoC estimate`—`~±N` convention, estimation method, double-check refinement, actual resolution measurement.
 
-## Sorties chat — conventions
+## Chat-output conventions
 
-Les sorties chat des modes suivent des templates normatifs définis dans `references/templates.md`. Lire ce fichier **avant chaque sortie chat** pour garder la forme stable d'une invocation à l'autre.
+Mode chat outputs follow normative templates in `references/templates.md`. Read that file **before every chat output** to keep form stable across invocations.
 
-**Conventions transverses** (résumé) :
-- **Header** des modes écrivant : `<Mode> terminé — <scope>`. Mode list utilise `Maintainability board — <projet>`.
-- **Trailer** « Files mis à jour : … » : présent à chaque mode qui écrit (audit, update, double-check, archive-clear, résolution intra-session). Absent du mode list (read-only).
-- Les blocs de proposition d'action utilisateur (post-audit, post-double-check single, post-double-check batch, post-list) sont distincts du récap — bloc séparé en fin de message.
+**Cross-cutting conventions** (summary):
+- **Header** for writing modes: `<Mode> complete — <scope>`. List uses `Maintainability board — <project>`.
+- **Trailer** `Files updated: …`: present for every writing mode (audit, update, double-check, archive-clear, in-session resolution). Absent from read-only list mode.
+- User-action proposal blocks (post-audit, single post-double-check, batch post-double-check, post-list) are separate from the recap—a distinct block at message end.
 
-Chaque playbook cite ses templates par leur nom (`selection:proposition`, `audit:summary`, `resolution:confirm`, …) ; `references/templates.md` en donne la liste complète (sommaire) et le format normatif de chacun.
+Each playbook names its templates (`selection:proposition`, `audit:summary`, `resolution:confirm`, …); `references/templates.md` gives the complete index and normative format.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-Avant de rendre la main à l'utilisateur, l'agent **doit** valider que toutes les écritures attendues du mode courant ont eu lieu. Garde-fou cognitif contre le drift sur les flux multi-écritures (résolution intra-session, update batch, cascade) — une étape secondaire peut être silencieusement omise après l'étape principale.
+Before returning control, the agent **must** validate that every expected write for the current mode occurred. This is a cognitive guardrail against drift in multi-write flows (in-session resolution, batch update, cascade), where a secondary step may be silently omitted after the primary one.
 
-**La checklist d'invariants de chaque mode vit en fin de son playbook** (`references/mode-<X>.md > Invariants de fin de mode`). Lire et cocher celle du mode courant avant de terminer. Règles transverses :
+**Each mode's invariant checklist is at the end of its playbook** (`references/mode-<X>.md > End-of-mode invariants`). Read and check the current mode's list before finishing. Cross-cutting rules:
 
-- Une case **non applicable** au cas courant (ex. cap Resolved pas dépassé donc pas d'archivage, pas de reclassification donc pas de titre amendé) est considérée cochée — la liste cible les omissions silencieuses, pas les opérations toujours requises.
-- **Si une case n'a pas pu être cochée** : si une condition empêche une écriture attendue (tests KO, fichier en lecture seule, conflit de merge dans le findings file), **annoncer en chat** ce qui n'a pas pu être fait et pourquoi, plutôt que rendre la main silencieusement. L'utilisateur doit savoir qu'un état partiel existe.
+- A box **not applicable** to the current case (e.g. Resolved cap not exceeded so no archival, no reclassification so no amended title) is considered checked—the list targets silent omissions, not universally required operations.
+- **If a box cannot be checked**: when a condition prevents an expected write (failing tests, read-only file, merge conflict in findings), **report in chat** what could not be done and why rather than returning silently. The user must know partial state exists.
 
 ## Edge cases
 
 ### Reclassification
 
-Si un finding s'avère mal catégorisé (e.g. `DUP-007` est en réalité un problème de complexité, pas de duplication) :
+If a finding proves miscategorized (e.g. `DUP-007` is actually complexity, not duplication):
 
-- **Garder l'ID.** `DUP-007` reste `DUP-007`.
-- Ajouter une bullet `Note: Reclassifié sémantiquement vers CPX, ID conservé pour traçabilité`.
-- Optionnel : ajuster la dimension dans la bullet `Dimension`.
+- **Keep the ID.** `DUP-007` remains `DUP-007`.
+- Add bullet `Note: Semantically reclassified to CPX; ID retained for traceability`.
+- Optional: adjust the dimension in the `Dimension` bullet.
 
-### Fichier déplacé / refactoré entre audits
+### File moved/refactored between audits
 
-La logique stale du mode update (`references/mode-update.md` étape 2.b et étape 4) s'applique aussi en `double-check` quand l'ID référencé pointe vers un fichier disparu.
+Update mode's stale logic (`references/mode-update.md` steps 2.b and 4) also applies in `double-check` when the referenced ID points to a missing file.
 
-### Doublons potentiels
+### Potential duplicates
 
-Si un audit produit un finding qui ressemble fortement à un finding pending existant (même fichier, même pattern) :
+If an audit produces a finding strongly resembling an existing pending finding (same file, same pattern):
 
-- Ne pas créer de doublon. Référencer l'ID existant dans le résumé chat : *"DUP-007 toujours présent — pas re-comptabilisé."*
-- Rafraîchir éventuellement la date de détection sur l'entrée existante.
+- Do not duplicate it. Reference the existing ID in the chat summary: *"DUP-007 still present—not counted again."*
+- Optionally refresh the detection date on the existing entry.
 
-### Conflit de prefix
+### Prefix conflict
 
-Si l'utilisateur a manuellement utilisé un préfixe inhabituel (e.g. `XXX-001`) dans le findings file, le skill le respecte et continue à incrémenter dans cette série si pertinent. Aucun "rebasage" automatique.
+If the user manually used an unusual prefix (e.g. `XXX-001`) in the findings file, respect it and continue incrementing that series when relevant. No automatic "rebasing."

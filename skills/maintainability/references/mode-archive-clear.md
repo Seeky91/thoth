@@ -1,31 +1,31 @@
-# Mode : archive-clear
+# Mode: archive-clear
 
-Référence chargée par SKILL.md en mode **archive-clear**, avec `[--all|--keep N|--older-than <duration>]`. Purge `maintainability_resolved_archive.md` selon les critères. Toujours confirmer avant d'écrire. Les conventions transverses (date déterministe) vivent dans SKILL.md et s'appliquent ici.
+Reference loaded by SKILL.md in **archive-clear** mode, with `[--all|--keep N|--older-than <duration>]`. Purge `maintainability_resolved_archive.md` according to the criteria. Always confirm before writing. The cross-cutting conventions (deterministic date) live in SKILL.md and apply here.
 
-## Flux
+## Flow
 
-1. Si l'archive n'existe pas : abort avec *"Pas d'archive sur ce projet, rien à clearer."*
-2. Parser les entrées de l'archive : extraire `ID` et la date `(résolu YYYY-MM-DD)` du titre.
-3. Calculer `dropped` / `kept` selon les args :
-   - **Défaut** (aucun flag) : drop entrées résolues il y a > 6 mois.
-   - `--older-than <duration>` : format `<entier><unité>` avec unités `d`/`m`/`y` (`m`=30j, `y`=365j). Ex. `6m`, `1y`, `90d`. Parse échoué → *"Durée `<input>` non reconnue. Format attendu : `6m`, `1y`, `90d`."*
-   - `--keep N` : conserver les N entrées les plus récentes (date du titre).
-   - `--all` : drop tout.
-4. **Recompute des compteurs d'IDs, en mémoire** : scanner findings + archive complète **avant** la suppression et calculer le futur header `<!-- id_counters: ... -->`. Garantit que les IDs futurs continuent de monter monotonement. **Ne rien écrire à ce stade** — la confirmation n'a pas encore eu lieu.
-5. **Confirmation utilisateur** : utiliser le template `archive-clear:confirm-all` (cas `--all`) ou `archive-clear:confirm-partial` (autres cas).
-6. **Après confirmation seulement**, appliquer les deux écritures ensemble : le header recalculé dans `maintainability_findings.md`, puis l'archive réécrite avec les seules entrées `kept`. Si `kept = []` (cas `--all`) : supprimer le fichier (recreation paresseuse au prochain débordement). Refus ou annulation → aucune écriture, header compris.
-7. Annoncer en chat via le template `archive-clear:done`.
+1. If the archive does not exist: abort with *"No archive in this project; nothing to clear."*
+2. Parse archive entries: extract the `ID` and `(resolved YYYY-MM-DD)` date from the title.
+3. Compute `dropped` / `kept` from the args:
+   - **Default** (no flag): drop entries resolved > 6 months ago.
+   - `--older-than <duration>`: format `<integer><unit>` with units `d`/`m`/`y` (`m`=30d, `y`=365d). E.g. `6m`, `1y`, `90d`. Parse failure → *"Unrecognized duration `<input>`. Expected format: `6m`, `1y`, `90d`."*
+   - `--keep N`: keep the N most recent entries (title date).
+   - `--all`: drop everything.
+4. **Recompute ID counters in memory**: scan findings + the complete archive **before** deletion and compute the future `<!-- id_counters: ... -->` header. This guarantees that future IDs remain monotonically increasing. **Write nothing at this stage**—confirmation has not yet occurred.
+5. **User confirmation**: use template `archive-clear:confirm-all` (`--all`) or `archive-clear:confirm-partial` (other cases).
+6. **Only after confirmation**, apply both writes together: the recomputed header in `maintainability_findings.md`, then rewrite the archive with only `kept` entries. If `kept = []` (`--all`): delete the file (lazy recreation on the next overflow). Refusal or cancellation → no writes, including the header.
+7. Report in chat via template `archive-clear:done`.
 
-## Garde-fous
+## Guardrails
 
-- Aucune modification sur `maintainability_findings.md` (sauf le header de compteurs) ni sur `maintainability_history.md`. Les références dangling depuis history vers une entrée archivée disparue restent — convention "voir git".
-- Confirmation obligatoire dans tous les cas, même par défaut — et **aucune écriture avant elle** (le recompute de l'étape 4 reste en mémoire jusqu'à l'étape 6).
-- Si le filtre ne capture aucune entrée : *"Filtre `<critère>` ne capture aucune entrée. Archive inchangée."* — pas d'écriture, pas même du header.
+- Do not modify `maintainability_findings.md` (except the counters header) or `maintainability_history.md`. Dangling history references to a deleted archived entry remain—"see git" convention.
+- Confirmation is mandatory in all cases, including the default—and **nothing is written before it** (the step 4 recomputation remains in memory until step 6).
+- If the filter captures no entries: *"Filter `<criterion>` captures no entries. Archive unchanged."*—no write, not even the header.
 
-## Invariants de fin de mode (archive-clear)
+## End-of-mode invariants (archive-clear)
 
-Avant de rendre la main, valider (une case **non applicable** est considérée cochée ; cf. SKILL.md > *Invariants de fin de mode* pour la règle transverse) :
+Before returning control, validate (a box **not applicable** to the current case is considered checked; see SKILL.md > *End-of-mode invariants* for the cross-cutting rule):
 
-- Archive réécrite avec les seules entrées `kept` (ou supprimée si `kept = []`, cas `--all`).
-- Header `<!-- id_counters: ... -->` recomputed — **calculé avant** la suppression, **écrit après** la confirmation, jamais écrit si l'utilisateur annule.
-- Pas d'écriture sur history ni sur findings (sauf le header de compteurs).
+- Archive rewritten with only `kept` entries (or deleted if `kept = []`, the `--all` case).
+- `<!-- id_counters: ... -->` header recomputed—**calculated before** deletion, **written after** confirmation, never written if the user cancels.
+- No write to history or findings (except the counters header).

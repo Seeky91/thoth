@@ -1,65 +1,65 @@
-# Qualité d'évaluation d'un finding
+# Finding evaluation quality
 
-Référence chargée par SKILL.md à l'exécution d'un audit, d'un crosscut ou d'un double-check, pour calibrer sévérité, garde-fous anti-bruit, et estimation Δ LoC.
+Reference loaded by SKILL.md while running an audit, crosscut, or double-check to calibrate severity, anti-noise guardrails, and Δ LoC estimates.
 
-## Grille de sévérité
+## Severity scale
 
-Sévérité = **impact × exposition**. Ce n'est pas un goût, c'est une calibration sur l'effet sur la maintenabilité du code.
+Severity = **impact × exposure**. It is not a preference; it calibrates the effect on code maintainability.
 
-- **HIGH** — bloque ou alourdit toute évolution future de la zone.
-  Exemples : god file dans un hot path, composition root centrale qui force chaque évolution boot/runtime/web à modifier le parent, duplication structurante (3+ copies de logique), drift de contrat utilisé partout, tests fondants empêchant tout refactor, cycle entre modules cœur, shotgun surgery récurrente (chaque feature touche 5+ fichiers).
-- **MED** — friction notable mais contournable.
-  Exemples : entrypoint ou root de sous-système qui mélange orchestration et wiring détaillé, incohérence locale de pattern, redondance modérée de tests, sprawl de config sur 2-3 modules, duplication 2× sur fonction utilitaire, couche pass-through, feature envy localisé.
-- **LOW** — cosmétique, nettoyage sans impact comportemental.
-  Exemples : commentaire stale, var inutilisée, doublon trivial dans helper jamais touché, doc d'une fonction self-explanatory, généricité spéculative sur un helper peu touché.
+- **HIGH**—blocks or burdens every future change in the area.
+  Examples: god file on a hot path; central composition root forcing every boot/runtime/web change into the parent; structural duplication (3+ copies of logic); widely used contract drift; brittle tests preventing any refactor; cycle between core modules; recurring shotgun surgery (each feature touches 5+ files).
+- **MED**—noticeable but avoidable friction.
+  Examples: entrypoint or subsystem root mixing orchestration and detailed wiring; local pattern inconsistency; moderate test redundancy; config sprawl across 2–3 modules; 2× duplication in a utility function; pass-through layer; localized feature envy.
+- **LOW**—cosmetic cleanup without behavioral impact.
+  Examples: stale comment; unused variable; trivial duplication in a rarely touched helper; documentation for a self-explanatory function; speculative generality in a rarely touched helper.
 
-**La sévérité est mutable.** Un `double-check` peut révéler que ce qu'on pensait HIGH est en fait MED (ou inversement). Dans ce cas : amender l'attribut sévérité dans l'entrée, **ne pas changer l'ID.**
+**Severity is mutable.** A `double-check` may reveal that something believed HIGH is actually MED (or vice versa). Then amend the entry's severity attribute; **do not change the ID.**
 
-## Quand ne PAS produire de finding
+## When NOT to produce a finding
 
-Le skill est intrinsèquement orienté détection, ce qui crée un biais structurel à sur-produire des findings pour "justifier" l'invocation. Sans contre-poids, l'audit dérive vers du **paperclip maximizing** : on optimise la maintenabilité jusqu'à dégrader d'autres aspects du projet. Cette section est le contrepoids.
+The skill is inherently detection-oriented, creating a structural bias toward overproducing findings to "justify" invocation. Without a counterweight, the audit drifts into **paperclip maximizing**: optimizing maintainability until other project qualities degrade. This section is that counterweight.
 
-### Conscience du biais à sur-produire
+### Awareness of overproduction bias
 
-Une zone qui produit 0 finding sur toutes les dimensions est un audit **réussi**, pas un audit raté. Corollaires opérationnels :
+An area yielding 0 findings across all dimensions is a **successful** audit, not a failed one. Operational consequences:
 
-- Ne pas remplir du vide pour rentabiliser l'invocation.
-- Si une dimension n'a rien produit après examen sérieux, passer à la suivante sans forcer.
-- Si la zone entière est propre, l'écrire (ligne history `0 findings (clean)`) et s'arrêter là — pas de finding "consolation" pour avoir l'air d'avoir travaillé.
-- Une dimension qui ne produit jamais rien sur une zone donnée n'est pas un échec d'audit ; le code peut être propre sur cet axe.
+- Do not fill empty space to justify the invocation.
+- If a dimension yields nothing after serious examination, move to the next without forcing it.
+- If the entire area is clean, record it (history line `0 findings (clean)`) and stop—no "consolation" finding to appear productive.
+- A dimension that never yields anything in a given area is not an audit failure; the code may be clean on that axis.
 
-### Trade-off check sur les autres axes du projet
+### Trade-off check against other project axes
 
-Si la reco améliorerait la maintenabilité au prix d'une dégradation visible sur un autre axe : **ne pas produire le finding** par défaut, ou le produire en annotant explicitement le trade-off dans la bullet `Reco`. Axes à vérifier avant production :
+If the recommendation would improve maintainability at the cost of visible degradation on another axis: **do not produce the finding** by default, or produce it while explicitly annotating the trade-off in `Recommendation`. Check these axes before production:
 
-- **Performance** : abstraction qui ajoute du coût per-call dans un hot path, allocation supplémentaire, indirection runtime introduite par un helper, copies de données en plus.
-- **Sécurité** : suppression d'un check, élargissement d'une surface d'attaque, partage d'état précédemment isolé, secret précédemment scopé qui devient transitif.
-- **Scalabilité** : suppression d'un seam d'extension, fusion de variantes "presque identiques" qui pourraient diverger demain, aplatissement qui bloque l'ajout futur d'une nouvelle responsabilité, suppression d'une couche d'indirection qui était un point de branchement. Trop simplifier aujourd'hui se paye cher quand on voudra accueillir une feature.
-- **Lisibilité paradoxale** : sur-abstraction qui crée des indirections plus difficiles à suivre que la duplication originale (DRY pathologique : 3 copies divergentes fusionnées en un helper paramétré incompréhensible avec un boolean qui change le comportement à mi-chemin), ou chaîne fonctionnelle dense / one-liner clever qui remplace trois lignes limpides par une expression à déplier mentalement.
+- **Performance**: abstraction adding per-call cost on a hot path, extra allocation, runtime indirection introduced by a helper, additional data copies.
+- **Security**: removal of a check, widening an attack surface, sharing previously isolated state, making a previously scoped secret transitive.
+- **Scalability**: removal of an extension seam; merging "nearly identical" variants that may diverge tomorrow; flattening that blocks a future responsibility; removing a layer of indirection that was a branching point. Oversimplifying today is costly when a feature must be accommodated later.
+- **Paradoxical readability**: over-abstraction creating indirections harder to follow than the original duplication (pathological DRY: 3 divergent copies merged into an incomprehensible parameterized helper with a boolean changing behavior midway), or a dense functional chain/clever one-liner replacing three obvious lines with an expression that must be mentally unpacked.
 
-**Règle par défaut** : si le trade-off est significatif, ne pas produire le finding. Si le finding est produit malgré un trade-off identifié, l'annoter dans la bullet `Reco` pour que l'utilisateur puisse trancher en connaissance de cause.
+**Default rule**: if the trade-off is significant, do not produce the finding. If a finding is produced despite an identified trade-off, annotate it in `Recommendation` so the user can decide with full context.
 
-Ce check intervient **en amont** de la production du finding. Il ne remplace pas le double-check (qui creuse la faisabilité d'un finding existant) — il intervient une étape avant, à la décision même de produire.
+This check occurs **before** finding production. It does not replace double-check (which investigates feasibility of an existing finding)—it occurs one step earlier, at the decision to produce anything.
 
-### Dogme ≠ défaut
+### Dogma ≠ defect
 
-S'applique surtout aux dimensions de jugement (`ARC`, `IDM`, `CPX`). Un écart à un paradigme, un pattern ou une école d'architecture n'est **pas** un finding en soi. Le finding exige un **symptôme concret de friction de maintenabilité**, citable et vérifiable : la modification qui a dû toucher N fichiers, le call site qui contourne l'abstraction, le bug pattern récurrent, la fonction que personne n'ose toucher. « Ce n'est pas conforme à X » (hexagonale, clean architecture, style fonctionnel pur…) n'est jamais une observation — c'est une préférence. La densité élevée tombe sous la **même barre** : elle n'est un symptôme que si le coût de lecture est concret et citable (un sous-concept réel qui n'a pas de nom, une décision importante noyée dans du détail, une séquence qu'on ne peut suivre sans retenir une pile d'éléments accidentels), jamais sur un simple ressenti « c'est trop dense ». L'objectif reste de rendre les responsabilités lisibles sans cacher les décisions importantes derrière des noms vagues. En l'absence de symptôme : abstention. Le cadre d'évaluation multi-paradigme vit dans `references/dimensions.md > Référentiel paradigmatique` ; ce garde-fou en est le pendant côté décision de produire.
+This applies especially to judgment dimensions (`ARC`, `IDM`, `CPX`). Deviation from a paradigm, pattern, or architecture school is **not** itself a finding. A finding requires a **concrete, citable, verifiable maintainability-friction symptom**: a change that had to touch N files, a call site bypassing the abstraction, a recurring bug pattern, a function nobody dares touch. "It does not follow X" (hexagonal, clean architecture, pure functional style, etc.) is never an observation—it is a preference. High density faces the **same bar**: it is a symptom only when the reading cost is concrete and citable (a real unnamed sub-concept, an important decision buried in detail, a sequence impossible to follow without retaining a stack of incidental elements), never from a mere sense that "it is too dense." The goal remains to make responsibilities legible without hiding important decisions behind vague names. Without a symptom: abstain. The multi-paradigm evaluation framework lives in `references/dimensions.md > Paradigmatic frame of reference`; this guardrail is its production-decision counterpart.
 
-## Estimation Δ LoC
+## Δ LoC estimate
 
-Chaque finding doit indiquer un `Δ LoC` estimé : la variation de lignes de code source que produirait l'application de la reco. Format `~±N` (le `~` marque l'estimation, le signe indique l'effet net).
+Each finding must state an estimated `Δ LoC`: the source-line change produced by applying the recommendation. Format `~±N` (`~` marks an estimate; the sign shows net effect).
 
-**Convention de signe :**
-- **Négatif** (`~-40`) : la reco réduit le code (extraction de duplication, suppression de dead code, fusion de variantes).
-- **Positif** (`~+30`) : la reco ajoute du code (split d'un god file en modules avec boilerplate, ajout d'une couche d'abstraction).
-- **Quasi-nul** (`~±5`) : la reco déplace ou réécrit sans réduire (renommage transverse, restructuration locale, harmonisation de pattern).
+**Sign convention:**
+- **Negative** (`~-40`): recommendation reduces code (deduplicating, removing dead code, merging variants).
+- **Positive** (`~+30`): recommendation adds code (splitting a god file into modules with boilerplate, adding an abstraction layer).
+- **Near-zero** (`~±5`): recommendation moves or rewrites without reducing (cross-cutting rename, local restructure, pattern harmonization).
 
-**Méthode d'estimation à l'audit :**
-- Mesurer la taille des occurrences impliquées (lignes du pattern × nombre de copies).
-- Soustraire la taille du helper / module extrait, en incluant un peu de boilerplate (signature, imports, docstring si nécessaire).
-- Pour les splits de god files : estimer à partir de la taille des responsabilités identifiées + ~10-20 % de boilerplate (imports, signatures, ré-exports).
-- Si l'estimation est trop incertaine pour être utile (e.g. la reco dépend de choix d'architecture non tranchés) : noter `Δ LoC : indéterminé — à affiner en double-check`.
+**Audit estimation method:**
+- Measure the size of involved occurrences (pattern lines × number of copies).
+- Subtract the extracted helper/module size, including some boilerplate (signature, imports, docstring if needed).
+- For god-file splits: estimate from the size of identified responsibilities + ~10–20% boilerplate (imports, signatures, re-exports).
+- If the estimate is too uncertain to be useful (e.g. recommendation depends on unresolved architecture choices): record `Δ LoC: indeterminate—refine during double-check`.
 
-**À l'application du fix (résolution) :** mesurer le delta réel via `git diff --stat` ou comptage direct, et le consigner dans `Resolution :`. Format `Δ LoC mesuré : -47`. C'est cette valeur qui compte dans les bilans, pas l'estimation initiale.
+**When applying the fix (resolution):** measure actual delta via `git diff --stat` or direct counting and record it in `Resolution:`. Format `Measured Δ LoC: -47`. This value, not the initial estimate, counts in summaries.
 
-**À un double-check :** raffiner l'estimation à la lumière du blast radius et des contraintes découvertes. Format `Δ LoC affiné : ~-35`. Si le raffinement contredit l'estimation initiale (> 50 % d'écart), expliquer brièvement pourquoi.
+**During a double-check:** refine the estimate using the blast radius and discovered constraints. Format `Refined Δ LoC: ~-35`. If refinement contradicts the initial estimate (> 50% difference), briefly explain why.

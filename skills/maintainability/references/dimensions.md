@@ -1,140 +1,140 @@
-# Catalogue des dimensions de maintenabilité
+# Maintainability dimension catalog
 
-Référence chargée par SKILL.md à l'exécution d'un audit ou d'un crosscut, pour cadrer ce qui constitue un finding sur chaque axe.
+Reference loaded by SKILL.md during an audit or crosscut to define what constitutes a finding on each axis.
 
-## Seed des dimensions
+## Seed dimensions
 
-12 dimensions de départ. **Ce n'est pas une grille fermée** : si un problème de maintenabilité réel ne colle à aucune, **invente un nouveau préfixe 3 lettres** (ex. `LOG-` pour sprawl de logging, `RAC-` pour patterns concurrents). La rigueur est sur l'observation factuelle, pas sur l'étiquetage.
+12 starting dimensions. **This is not a closed taxonomy**: if a real maintainability problem fits none, **invent a new 3-letter prefix** (e.g. `LOG-` for logging sprawl, `RAC-` for concurrency patterns). Rigor applies to factual observation, not labeling.
 
-| Préfixe | Dimension | Cible |
+| Prefix | Dimension | Target |
 |---|---|---|
-| `DUP` | Duplication / DRY | Code répété, logique copiée-collée avec variations mineures, schémas dupliqués |
-| `CPX` | Complexité inutile, factorisation | Imbrications profondes, accumulation de conditions, opportunités d'extraire un helper |
-| `SIZ` | Taille excessive | God files (≥600 LoC source), modules mêlant trop de responsabilités |
-| `DED` | Code mort | Exports/imports inutilisés, branches inatteignables, blocs commentés laissés en place |
-| `INC` | Patterns incohérents | 3 façons de paginer, 4 conventions d'erreur, 2 styles de logging dans le même module |
-| `IDM` | Idiomes du langage | Non-conformité aux patterns idiomatiques du langage : gestion d'erreur, gestion des ressources, builder pattern, types stricts, etc. (cf. cadrage dédié) |
-| `BND` | Violations de frontière, couplage caché | Module A qui importe les internes de B, contournement de l'API publique, co-changement fréquent |
-| `DRF` | Drift de types/interfaces | Schémas quasi-identiques qui divergent par accident, dup back/front, types parallèles |
-| `TST` | Tests | Redondance, fragilité, ratio code/test qui dérive (tests devenant la majorité du code), tests d'impl plutôt que de contrat |
-| `CFG` | Config / feature-flags sprawl | Env vars / flags accumulés, certains plus jamais flippés ou lus |
-| `DOC` | Doc/commentaires | Désync code/doc, ET commentaires inutiles sur code self-explanatory (paraphrase d'un nom de fonction explicite) |
-| `ARC` | Architecture / couplage | Cycles inter-modules, responsabilité mal placée (feature envy), shotgun surgery, abstraction fuyante ou spéculative, composition roots opaques, couches pass-through, sur-fragmentation (cf. cadrage dédié) |
+| `DUP` | Duplication / DRY | Repeated code, copy-pasted logic with minor variations, duplicated schemas |
+| `CPX` | Unnecessary complexity, factoring | Deep nesting, accumulated conditions, opportunities to extract a helper |
+| `SIZ` | Excessive size | God files (≥600 source LoC), modules mixing too many responsibilities |
+| `DED` | Dead code | Unused exports/imports, unreachable branches, abandoned commented-out blocks |
+| `INC` | Inconsistent patterns | 3 pagination methods, 4 error conventions, 2 logging styles in one module |
+| `IDM` | Language idioms | Nonconformity with idiomatic language patterns: error handling, resource management, builder pattern, strict types, etc. (see dedicated framing) |
+| `BND` | Boundary violations, hidden coupling | Module A importing B's internals, public-API bypasses, frequent co-change |
+| `DRF` | Type/interface drift | Nearly identical schemas accidentally diverging, front/back duplication, parallel types |
+| `TST` | Tests | Redundancy, brittleness, drifting code/test ratio (tests becoming most of the code), implementation rather than contract tests |
+| `CFG` | Config / feature-flag sprawl | Accumulated env vars/flags, some never flipped or read anymore |
+| `DOC` | Docs/comments | Code/docs desynchronization AND unnecessary comments on self-explanatory code (paraphrasing an explicit function name) |
+| `ARC` | Architecture / coupling | Inter-module cycles, misplaced responsibility (feature envy), shotgun surgery, leaky or speculative abstraction, opaque composition roots, pass-through layers, over-fragmentation (see dedicated framing) |
 
-**Hors scope du skill** : sécurité, performance, accessibilité, choix de stack. Précision : l'architecture *interne* du repo est couverte (`ARC`) ; le choix de stack/framework et l'architecture d'infra/déploiement restent exclus.
+**Out of scope**: security, performance, accessibility, stack selection. Clarification: *internal* repo architecture is covered (`ARC`); stack/framework choice and infrastructure/deployment architecture remain excluded.
 
-**Principe d'observation** : décrire le problème en clair (fait vérifiable, fichier:ligne, impact concret) **avant** de chercher quel préfixe coller. Ne pas forcer une dimension par audit.
+**Observation principle**: describe the problem plainly (verifiable fact, file:line, concrete impact) **before** selecting a prefix. Do not force a dimension per audit.
 
-### Frontières entre dimensions voisines
+### Boundaries between adjacent dimensions
 
-Plusieurs dimensions se partagent le territoire « structure du code ». Règle d'affectation (évite les litiges de reclassification) :
+Several dimensions share "code structure" territory. Assignment rule (avoids reclassification disputes):
 
-| Le défaut porte sur… | Dimension |
+| Defect concerns… | Dimension |
 |---|---|
-| le flux de contrôle *dans une fonction* (nesting, structure inversée, fragmentation intra-fichier) | `CPX` |
-| la taille d'un fichier/module | `SIZ` |
-| la transgression d'une frontière *déclarée* (import d'internes, contournement d'API publique) | `BND` |
-| un idiome d'*expression* du langage (gestion d'erreur, ressources, types, construction) | `IDM` |
-| le mélange de niveaux d'abstraction dans une fonction de composition (entrypoint, bootstrap, factory de sous-système) | `ARC` |
-| la forme des relations *entre unités* : placement des responsabilités, graphe de dépendances, qualité d'abstraction | `ARC` |
+| control flow *within a function* (nesting, inverted structure, intra-file fragmentation) | `CPX` |
+| file/module size | `SIZ` |
+| violation of a *declared* boundary (internal import, public-API bypass) | `BND` |
+| a language *expression* idiom (errors, resources, types, construction) | `IDM` |
+| mixed abstraction levels in a composition function (entrypoint, bootstrap, subsystem factory) | `ARC` |
+| relationship shape *between units*: responsibility placement, dependency graph, abstraction quality | `ARC` |
 
-`BND` vs `ARC` en une phrase : `BND` = une règle existe et est violée ; `ARC` = aucune règle violée, la structure elle-même est le défaut.
+`BND` vs `ARC` in one sentence: `BND` = a rule exists and is violated; `ARC` = no rule is violated, but the structure itself is defective.
 
-## Outils de détection opportunistes
+## Opportunistic detection tools
 
-Source unique de la cartographie outil↔dimension, référencée par `references/mode-audit.md > E.1bis` et `references/mode-crosscut.md > C`. Pour les dimensions mécanisables, un outil déterministe bat l'agent en **rappel** et en **localisation** ; l'agent garde le **jugement**. Posture invariante :
+Single source for tool↔dimension mapping, referenced by `references/mode-audit.md > E.1bis` and `references/mode-crosscut.md > C`. For mechanizable dimensions, deterministic tooling beats the agent on **recall** and **location**; the agent retains **judgment**. Invariant posture:
 
-- **Opportuniste, jamais obligatoire.** Tester la présence (`command -v <outil>`, ou la présence d'un manifeste de langage) ; si absent, repli sur la lecture/jugement — aucune dépendance dure n'est introduite.
-- **Exécuter, ne pas lire.** C'est la **sortie** de l'outil (idéalement JSON) qui entre en contexte, pas le code source — gain de tokens et de précision.
-- **L'outil propose, l'agent dispose.** Un hit outil = un **candidat à examiner**, pas un finding. L'agent applique ensuite la grille de sévérité, le trade-off check (`references/quality.md`) et peut écarter le bruit. Un seuil d'outil franchi (p.ex. complexité cyclomatique = 11) n'est *pas* un finding en soi.
+- **Opportunistic, never mandatory.** Check availability (`command -v <tool>`, or a language manifest); if absent, fall back to reading/judgment—introduce no hard dependency.
+- **Execute; do not read.** Bring the tool's **output** (ideally JSON) into context, not source code—saving tokens and improving precision.
+- **The tool proposes; the agent decides.** A tool hit is a **candidate to examine**, not a finding. Then apply severity, trade-off check (`references/quality.md`), and noise filtering. Crossing a tool threshold (e.g. cyclomatic complexity = 11) is *not* itself a finding.
 
-| Dimension | Outils (sortie JSON si dispo) | Notes |
+| Dimension | Tools (JSON output if available) | Notes |
 |---|---|---|
-| `DUP` | `jscpd` (≈223 langages, reporters json/sarif), PMD `CPD` | Donne blocs dupliqués + localisation exacte ; idéal en crosscut repo-wide. |
-| `DED` | `knip` (JS/TS), `vulture` (Python, scores de confiance), `deadcode -json` (Go), `cargo-machete`/`cargo-udeps` (Rust), `staticcheck` U1000 (Go) | Exports/déps inutilisés. Garder la prudence anti-faux-positif du crosscut `DED` (API publiques, hooks de framework, barrels). |
-| `SIZ` / `CPX` | `scc` (LoC + complexité, `--by-file -f json`), `tokei -o json` (LoC), `lizard` (CCN multi-langage), `radon cc -j` (Python) | Sert aussi à l'inventaire de zones (`references/mode-audit.md > B.0`). |
-| `CFG` | `ripgrep` ciblé (`rg` sur lectures d'env vars / flags), `dotenv-linter` (drift `.env`) | Repérer les flags accumulés / jamais lus. |
-| `BND` | graphes d'imports : `madge --circular` (JS/TS), `go list -deps`, `import-linter` (Python), `pydeps` | Cycles, fan-in-out, contournements de frontière. |
-| `ARC` | mêmes graphes d'imports que `BND` (+ `dependency-cruiser` JS/TS, règles + JSON), **co-change git** (`git log`, aucune dépendance externe) | Cycles, fan-in/out × churn, couplage temporel. Méthode co-change : cf. cadrage `ARC` ci-dessous — signal langage-agnostique. |
-| `DRF` | comparaison de schémas/types au jugement (pas d'outil générique fiable) | Reste majoritairement à la lecture. |
+| `DUP` | `jscpd` (≈223 languages, JSON/SARIF reporters), PMD `CPD` | Returns duplicate blocks + exact location; ideal repo-wide crosscut. |
+| `DED` | `knip` (JS/TS), `vulture` (Python, confidence scores), `deadcode -json` (Go), `cargo-machete`/`cargo-udeps` (Rust), `staticcheck` U1000 (Go) | Unused exports/deps. Preserve crosscut `DED` false-positive caution (public APIs, framework hooks, barrels). |
+| `SIZ` / `CPX` | `scc` (LoC + complexity, `--by-file -f json`), `tokei -o json` (LoC), `lizard` (multi-language CCN), `radon cc -j` (Python) | Also supports area inventory (`references/mode-audit.md > B.0`). |
+| `CFG` | targeted `ripgrep` (`rg` over env-var/flag reads), `dotenv-linter` (`.env` drift) | Find accumulated/never-read flags. |
+| `BND` | import graphs: `madge --circular` (JS/TS), `go list -deps`, `import-linter` (Python), `pydeps` | Cycles, fan-in/out, boundary bypasses. |
+| `ARC` | same import graphs as `BND` (+ JS/TS `dependency-cruiser`, rules + JSON), **git co-change** (`git log`, no external dependency) | Cycles, fan-in/out × churn, temporal coupling. Co-change method: see `ARC` framing below—language-agnostic signal. |
+| `DRF` | schema/type comparison by judgment (no reliable general tool) | Mostly reading-based. |
 
-Pour `INC`, `IDM`, `TST`, `DOC` : pas d'outil fiable de substitution — détection au jugement (et pour `IDM`, garde-fou anti-linter strict ci-dessous).
+For `INC`, `IDM`, `TST`, `DOC`: no reliable substitute tool—use judgment (and for `IDM`, the strict anti-linter guardrail below).
 
-## Référentiel paradigmatique (transverse à ARC, IDM, CPX)
+## Paradigmatic frame of reference (cross-cutting for ARC, IDM, CPX)
 
-Le skill n'impose aucun dogme architectural unique. Les invariants évalués sont **haute cohésion, faible couplage, lisibilité structurelle** — leur *forme* idiomatique varie selon le paradigme (module fonctionnel pur, composition par traits, classe cohésive). Méthode :
+The skill imposes no single architectural dogma. Evaluated invariants are **high cohesion, low coupling, structural readability**—their idiomatic form varies by paradigm (pure functional module, trait composition, cohesive class). Method:
 
-1. **Détecter le(s) langage(s)** — mécanisme existant du cadrage `IDM` (extensions + fichiers de config).
-2. **Détecter le paradigme effectif du codebase** : signaux observables — traits/interfaces vs hiérarchies d'héritage, fonctions libres vs classes, immutabilité dominante, composition vs extension.
-3. **Référentiel = idiomes du langage ∩ conventions établies du codebase.** En cas de conflit, **la convention du codebase prime** (la cohérence interne bat le dogme). Exception : quand le codebase « se bat contre le langage » et que la friction est *observable et récurrente* (ex. hiérarchies d'héritage simulées par embedding en Go, mutabilité partagée qui combat le borrow checker Rust). Pourquoi cette règle : sans elle, le skill produirait des dizaines de findings contre un codebase Python délibérément orienté objet — du dogme, pas de la dette.
-4. **Évaluer relativement à ce référentiel**, jamais contre un style d'architecture nommé (hexagonale, clean, DDD) en tant que tel. La densité logique reste une **qualité** tant qu'elle est cohésive et scannable ; elle ne devient actionnable que si elle a un **coût de lecture concret et citable** — un sous-concept réel qui n'a pas de nom, une décision importante noyée dans du détail, une séquence qu'on ne peut suivre sans retenir une pile d'éléments accidentels. « C'est trop dense » sans ce coût n'est pas un finding. La régression à éviter est la fragmentation en wrappers triviaux ou en noms vagues qui rendent la navigation plus coûteuse que le bloc original.
-5. **Abstention sur méconnaissance** : même clause que le cadrage `IDM` — paradigme ou écosystème hors zone de confort → s'abstenir et l'annoncer en chat.
+1. **Detect language(s)**—existing `IDM` mechanism (extensions + config files).
+2. **Detect the codebase's effective paradigm** through observable signals—traits/interfaces vs inheritance hierarchies, free functions vs classes, dominant immutability, composition vs extension.
+3. **Reference = language idioms ∩ established codebase conventions.** On conflict, **codebase convention wins** (internal consistency beats dogma). Exception: when the codebase "fights the language" and friction is *observable and recurring* (e.g. inheritance hierarchies simulated through Go embedding, shared mutability fighting Rust's borrow checker). Rationale: otherwise the skill would produce dozens of findings against an intentionally object-oriented Python codebase—dogma, not debt.
+4. **Evaluate relative to that reference**, never against a named architecture style (hexagonal, clean, DDD) itself. Logical density remains a **quality** while cohesive and scannable; it becomes actionable only with a **concrete, citable reading cost**—a real unnamed sub-concept, an important decision buried in detail, a sequence impossible to follow without holding a stack of incidental elements. "Too dense" without that cost is not a finding. Avoid regression into trivial wrappers or vague names that make navigation costlier than the original block.
+5. **Abstain when unfamiliar**: same clause as `IDM` framing—if paradigm or ecosystem is outside the comfort zone, abstain and report it in chat.
 
-Pas de table par langage dans le skill (elle vieillirait mal) : l'agent s'appuie sur sa connaissance des paradigmes du langage rencontré, le skill spécifie la méthode et les garde-fous.
+No per-language table (it would age poorly): rely on knowledge of encountered language paradigms; the skill specifies method and guardrails.
 
-## Cadrage de la dimension IDM
+## IDM dimension framing
 
-`IDM` cible la non-conformité aux patterns idiomatiques du langage. Le risque de cette dimension est qu'elle dérive en linter de style — le cadrage suivant est strict. S'évalue contre le *Référentiel paradigmatique* ci-dessus. **Frontière avec `ARC`** : `IDM` juge l'expression *dans* le code (comment c'est écrit) ; la structure *entre* unités relève d'`ARC`.
+`IDM` targets nonconformity with idiomatic language patterns. Its risk is drifting into a style linter—the following framing is strict. Evaluate against the *Paradigmatic frame of reference* above. **Boundary with `ARC`**: `IDM` judges expression *within* code (how it is written); structure *between* units belongs to `ARC`.
 
-**Détection des langages** : avant l'audit, identifier les langages via extensions et fichiers de config (`Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, `Gemfile`, `pom.xml`, `composer.json`, …). Sur projet multi-langage, évaluer IDM zone par zone selon le langage dominant.
+**Language detection**: before audit, identify languages via extensions and config (`Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, `Gemfile`, `pom.xml`, `composer.json`, …). In a multi-language project, assess IDM area by area using the dominant language.
 
-**Périmètre inclus** : patterns structurels avec impact maintenabilité direct — lisibilité par un dev habitué au langage, error-prone-ness évitable, friction avec l'écosystème. Familles à couvrir : gestion d'erreur idiomatique (Rust `Result`/`?`, Go error wrapping, Python `try/except` ciblé), gestion des ressources (context managers Python, `defer` Go, RAII Rust, try-with-resources Java), types et conteneurs adaptés (dataclasses Python, types stricts TS, `Optional` Java), patterns de construction du langage (builder Rust, comprehensions Python). L'agent s'appuie sur sa connaissance des idiomes du langage rencontré, pas sur une liste fermée du skill.
+**Included scope**: structural patterns with direct maintainability impact—readability to a developer familiar with the language, avoidable error-proneness, ecosystem friction. Cover families: idiomatic error handling (Rust `Result`/`?`, Go error wrapping, targeted Python `try/except`), resource management (Python context managers, Go `defer`, Rust RAII, Java try-with-resources), suitable types/containers (Python dataclasses, strict TS types, Java `Optional`), language construction patterns (Rust builder, Python comprehensions). Rely on knowledge of encountered language idioms, not a closed skill list.
 
-**Périmètre exclu** : tout ce qui est automatisable par un linter ou un formatter — naming style (snake_case vs camelCase), ordre des imports, indentation, choix de quotes, longueur de ligne, espace avant parenthèse. Hors scope du skill.
+**Excluded scope**: anything automatable by a linter or formatter—naming style (snake_case vs camelCase), import order, indentation, quote choice, line length, space before parentheses. Outside this skill.
 
-**Abstention sur méconnaissance** : si l'agent n'a pas une connaissance suffisante des idiomes d'un langage présent dans la zone, il s'abstient sur cette dimension plutôt que d'inventer des règles. Note honnête en chat type *"Je passe IDM sur ce fichier Elixir : idiomes du langage hors zone de confort."*
+**Abstain when unfamiliar**: if language-idiom knowledge is insufficient, abstain on this dimension rather than inventing rules. Honest chat note such as *"Skipping IDM for this Elixir file: language idioms are outside my comfort zone."*
 
-## Cadrage de la dimension ARC
+## ARC dimension framing
 
-`ARC` cible les défauts de structure **entre unités** (modules, couches, abstractions). C'est la dimension la plus subjective du catalogue — le risque est qu'elle dérive en linter d'architecture. Le cadrage suivant est strict, symétrique de celui d'`IDM`.
+`ARC` targets structural defects **between units** (modules, layers, abstractions). It is the catalog's most subjective dimension—risking drift into an architecture linter. The following framing is strict and symmetric with `IDM`.
 
-**Préalable** : évaluer contre le *Référentiel paradigmatique* ci-dessus, jamais contre un dogme. Et appliquer `references/quality.md > Dogme ≠ défaut` : sans symptôme concret de friction, pas de finding.
+**Prerequisite**: evaluate against the *Paradigmatic frame of reference*, never dogma. Apply `references/quality.md > Dogma ≠ defect`: no concrete friction symptom, no finding.
 
-**Périmètre inclus** (symptômes observables uniquement) :
+**Included scope** (observable symptoms only):
 
-- **Couplage** : cycles inter-modules ; couplage temporel (fichiers co-modifiés de façon répétée à travers une frontière de module **sans** relation d'import) ; module à fort fan-in × fort churn (beaucoup en dépendent ET il bouge tout le temps — aimant à casse).
-- **Cohésion** : responsabilité mal placée — feature envy (fonction qui manipule majoritairement les données d'un autre module) ; shotgun surgery (modifier un concept force à toucher N fichiers — seam manquant).
-- **Abstraction** : fuyante (les call sites doivent connaître l'interne — observable : un client importe le module ET ses internes dans le même fichier) ; spéculative (généricité jamais exercée : interface à implémenteur unique conçue « pour plus tard », paramètres jamais variés) ; couche pass-through / middle-man (module dont la majorité des exports délèguent sans rien ajouter) ; **sur-fragmentation** (logique éclatée en miettes d'indirection là où une unité cohésive et nommée serait plus lisible — le miroir de `SIZ`).
-- **Composition roots / entrypoints locaux** : point d'entrée applicatif, builder/factory de sous-système, façade publique structurante ou assembly de pipeline qui mélange orchestration haut niveau, construction détaillée de dépendances concrètes, configuration bas niveau et logique métier au point que la séquence de boot/traitement n'est plus scannable.
+- **Coupling**: inter-module cycles; temporal coupling (files repeatedly co-modified across a module boundary **without** an import relationship); high fan-in × high churn module (many depend on it AND it changes constantly—a breakage magnet).
+- **Cohesion**: misplaced responsibility—feature envy (function mostly manipulating another module's data); shotgun surgery (changing one concept forces edits in N files—a missing seam).
+- **Abstraction**: leaky (call sites must know internals—observable when a client imports both the module AND its internals in one file); speculative (unused generality: single-implementer interface designed "for later," parameters never varied); pass-through/middle-man layer (most exports merely delegate); **over-fragmentation** (logic split into indirection fragments where one named cohesive unit would be clearer—the mirror of `SIZ`).
+- **Composition roots / local entrypoints**: application entrypoint, subsystem builder/factory, structuring public facade, or pipeline assembly mixing high-level orchestration, detailed construction of concrete dependencies, low-level config, and business logic until the boot/processing sequence is no longer scannable.
 
-**Preuve de friction exigée** : chaque finding `ARC` cite un symptôme concret et vérifiable — le commit qui a dû toucher 7 fichiers, le call site qui contourne l'abstraction, le cycle fichier:ligne, le bug pattern récurrent, la construction d'un sous-système qui oblige le parent à connaître ses détails internes. « Ce n'est pas conforme au pattern X » n'est jamais une observation.
+**Friction evidence required**: every `ARC` finding cites a concrete, verifiable symptom—the commit that had to touch 7 files, a call site bypassing the abstraction, a file:line cycle, recurring bug pattern, or subsystem construction forcing the parent to know internal details. "It does not follow pattern X" is never an observation.
 
-**Reco incrémentale obligatoire** : la reco d'un `ARC` propose un **premier pas** (inverser une dépendance, extraire une interface, déplacer une fonction, introduire un constructeur/factory nommé possédé par le sous-système), jamais une réorganisation big-bang. Le Δ LoC porte sur ce premier pas ; si la cible finale est plus large, la nommer dans la reco sans la chiffrer.
+**Incremental recommendation mandatory**: an `ARC` recommendation proposes a **first step** (invert a dependency, extract an interface, move a function, introduce a named constructor/factory owned by the subsystem), never big-bang reorganization. Δ LoC covers that first step; if the final target is larger, name it without estimating it.
 
-**Heuristiques de détection** (candidats à examiner, jamais findings — posture outillée standard) :
+**Detection heuristics** (candidates only, never findings—standard tool posture):
 
-- **Co-change git** : sur les ~200 derniers commits hors maintainability (réutiliser le set `commits_maintainability` du signal d'activité, cf. `references/mode-audit.md > C`), paires de fichiers fréquemment co-modifiées (ordre de grandeur : ≥ 5 co-occurrences) à travers une frontière de module sans lien d'import = couplage caché ; commits de feature touchant répétitivement ≥ 3 modules = shotgun surgery. Exclure lockfiles et généré.
-- **Instabilité × churn** : croiser le fan-in du graphe d'imports avec le churn git — les modules hauts sur les deux axes sont les candidats prioritaires.
-- **Ratio pass-through** : exports qui ne font que re-exporter/déléguer sans rien ajouter, détectable au `rg`.
-- **Landmarks architecturaux** : fichiers ou symboles de composition (`main`, `app`, `server`, `worker`, `bootstrap`, `init`, `start`, `build`, `new`, `factory`, `router`, `pipeline`, façade publique structurante). Signal seulement si le landmark assemble plusieurs dépendances/sous-systèmes ou fixe une politique de lifecycle ; ignorer les helpers triviaux et simples barrels/réexports.
+- **Git co-change**: across the ~200 latest non-maintainability commits (reuse `commits_maintainability` from the activity signal; see `references/mode-audit.md > C`), file pairs frequently co-modified (order of magnitude: ≥ 5 co-occurrences) across a module boundary with no import link = hidden coupling; feature commits repeatedly touching ≥ 3 modules = shotgun surgery. Exclude lockfiles and generated files.
+- **Instability × churn**: combine import-graph fan-in with git churn—modules high on both axes are priority candidates.
+- **Pass-through ratio**: exports that only re-export/delegate without adding anything, detectable with `rg`.
+- **Architectural landmarks**: composition files/symbols (`main`, `app`, `server`, `worker`, `bootstrap`, `init`, `start`, `build`, `new`, `factory`, `router`, `pipeline`, structuring public facade). Signal only if the landmark assembles several dependencies/subsystems or sets lifecycle policy; ignore trivial helpers and simple barrels/re-exports.
 
-### Composition roots et niveau d'abstraction
+### Composition roots and abstraction level
 
-Une composition root est un point qui assemble des dépendances concrètes et fixe une politique de lifecycle. Elle peut être globale (`main`, serveur, CLI) ou locale à un sous-système (runtime engine, web state, worker, router, pipeline, client externe). La lentille est **récursive mais bornée** : chaque boundary importante mérite une composition lisible ; les opérations atomiques n'ont pas besoin de devenir des mini-entrypoints.
+A composition root assembles concrete dependencies and sets lifecycle policy. It may be global (`main`, server, CLI) or local to a subsystem (runtime engine, web state, worker, router, pipeline, external client). The lens is **recursive but bounded**: each important boundary deserves readable composition; atomic operations need not become mini-entrypoints.
 
-Chercher le principe de **niveau d'abstraction uniforme** : une fonction de composition devrait lire comme une suite d'étapes nommées au même niveau ("charger config → créer runtime → démarrer engine → servir web"), pas alterner cette histoire avec des détails de locks, channels, maps, parsers, adapters ou champs internes.
+Look for **uniform abstraction level**: a composition function should read as same-level named steps ("load config → create runtime → start engine → serve web"), not alternate that story with locks, channels, maps, parsers, adapters, or internal fields.
 
-Produire un finding seulement si la friction est observable : séquence de boot/traitement difficile à scanner, parent obligé de connaître les champs internes d'un sous-système, changement local qui impose d'éditer l'entrypoint parent, wiring similaire recopié entre plusieurs roots, ou politique globale noyée dans du détail accidentel.
+Produce a finding only for observable friction: hard-to-scan boot/processing sequence, parent forced to know subsystem internal fields, local change requiring parent-entrypoint edits, similar wiring copied across roots, or global policy buried in incidental detail.
 
-Reco attendue : déplacer le détail vers un constructeur/factory nommé et possédé par le sous-système (`Runtime::new`, `WebState::from_config`, `build_router`, `start_worker`, etc. selon le langage), tout en gardant visibles dans le parent les politiques globales (ordre de boot, fallback non fatal, shutdown, choix de mode). Une extraction à usage unique est acceptable si elle nomme un concept réel ou baisse une densité qui gêne la lecture. **Ne pas recommander** de wrappers pass-through ni de noms vagues qui déplacent seulement le problème ou cachent les décisions importantes.
+Expected recommendation: move detail into a named subsystem-owned constructor/factory (`Runtime::new`, `WebState::from_config`, `build_router`, `start_worker`, etc. according to language), while retaining global policies in the parent (boot order, nonfatal fallback, shutdown, mode choice). A single-use extraction is acceptable when it names a real concept or reduces density that impairs reading. **Do not recommend** pass-through wrappers or vague names that merely move the problem or hide important decisions.
 
-**Périmètre exclu** : conformité à un style d'architecture nommé en tant que telle ; choix de stack/framework ; architecture d'infra/déploiement ; god files (→ `SIZ`) ; transgressions de frontières déclarées (→ `BND`) ; cf. *Frontières entre dimensions voisines*.
+**Excluded scope**: adherence to a named architecture style itself; stack/framework selection; infrastructure/deployment architecture; god files (→ `SIZ`); declared-boundary violations (→ `BND`); see *Boundaries between adjacent dimensions*.
 
-**En zonal vs crosscut** : la cohésion (feature envy, sur-fragmentation, abstraction locale, composition roots opaques) se juge en audit zonal — avec la frontière d'imports de la zone (cf. `references/mode-audit.md > E`) ; le couplage profond (cycles, co-change, instabilité × churn) relève du crosscut `ARC`.
+**Zonal vs crosscut**: assess cohesion (feature envy, over-fragmentation, local abstraction, opaque composition roots) in zonal audit—with the area's import boundary (see `references/mode-audit.md > E`); deep coupling (cycles, co-change, instability × churn) belongs to `ARC` crosscut.
 
-**Abstention sur méconnaissance** : même clause qu'`IDM`.
+**Abstain when unfamiliar**: same clause as `IDM`.
 
-## Cadrage de la dimension CPX — design épuré
+## CPX dimension framing—clean design
 
-`CPX` cible la complexité *intra-fonction*. Doctrine : la lisibilité vient de la **structure**, pas de règles de formatage ni de seuils statistiques.
+`CPX` targets *intra-function* complexity. Doctrine: readability comes from **structure**, not formatting rules or statistical thresholds.
 
-**Ce qu'on cherche** :
+**Look for**:
 
-- **Structure inversée** : early returns / guard clauses absents. Heuristique de signature : **le cas nominal doit être le chemin le moins indenté** — une fonction dont le return nominal est au niveau d'indentation le plus profond est candidate.
-- Chaînes if/else qui seraient un pattern matching / switch exhaustif **plat** dans le langage.
-- Conditions à inverser pour dégager le flux principal.
-- **Fragmentation excessive intra-fichier** : cascade de helpers à usage unique qui forcent le lecteur à sauter — extraire un helper quand il **nomme un concept réel**, ou quand la densité a un coût de lecture citable (sous-concept sans nom, décision noyée), jamais pour réduire mécaniquement une longueur ni sur un ressenti « trop dense » ; éviter les wrappers triviaux ou noms vagues qui ne font que déplacer le code (la version inter-unités est `ARC` sur-fragmentation).
+- **Inverted structure**: missing early returns/guard clauses. Signature heuristic: **the nominal case should be the least-indented path**—a function whose nominal return is at the deepest indentation is a candidate.
+- If/else chains better expressed as **flat** exhaustive pattern matching/switch in the language.
+- Conditions to invert to expose the main flow.
+- **Excessive intra-file fragmentation**: cascades of single-use helpers forcing reader jumps—extract a helper when it **names a real concept**, or density has a citable reading cost (unnamed sub-concept, buried decision), never mechanically to reduce length or from a sense that it is "too dense"; avoid trivial wrappers or vague names that only move code (the inter-unit form is `ARC` over-fragmentation).
 
-**Anti-seuil explicite** : pas de « max N niveaux d'imbrication », pas de complexité cyclomatique-as-finding. Un nesting de 4 qui reflète l'arbre de décision réel du domaine peut être la forme la plus claire. Les outils (`lizard`, `radon`) fournissent des candidats ; le jugement tranche — posture « l'outil propose, l'agent dispose ».
+**Explicit anti-threshold**: no "maximum N nesting levels," no cyclomatic-complexity-as-finding. Nesting level 4 may be the clearest form of a real domain decision tree. Tools (`lizard`, `radon`) supply candidates; judgment decides—the tool proposes, the agent decides.
 
-**Garde comportementale** : une réécriture early-return doit préserver le comportement — attention aux langages sans `defer`/RAII où un return anticipé saute un cleanup. Mentionner ce point dans la `Reco` quand applicable.
+**Behavior guard**: an early-return rewrite must preserve behavior—beware languages without `defer`/RAII where an early return skips cleanup. Mention this in `Recommendation` when applicable.

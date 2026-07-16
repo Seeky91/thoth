@@ -1,192 +1,192 @@
-# Templates de sortie chat
+# Chat output templates
 
-Lire avant chaque sortie d'un mode. Respecter la structure ; adapter uniquement les placeholders. Les modes qui écrivent terminent par `Files mis à jour`, contrairement à `list`.
+Read before every mode output. Preserve the structure; adapt placeholders only. Modes that write end with `Files updated`, unlike `list`.
 
 ## `selection:proposition`
 
 ```text
-Je propose : <scope> — <motif>
-Matérialité : <forte|moyenne> — <exposition sourcée × coût plausible>
-Workload : <commande/scénario sanitised>
-Métrique : <métrique primaire>
-Alternatives : <scope-alt-1> — <motif>, <scope-alt-2> — <motif>
-Écartés (exposure-capped) : <scope> — <calcul court> ; ...
+I propose: <scope> — <reason>
+Materiality: <high|medium> — <sourced exposure × plausible cost>
+Workload: <sanitized command/scenario>
+Metric: <primary metric>
+Alternatives: <alt-scope-1> — <reason>, <alt-scope-2> — <reason>
+Excluded (exposure-capped): <scope> — <short calculation>; ...
 ```
 
-Ajouter `Information requise : <manque>` si aucun workload représentatif n'est disponible. Omettre la ligne `Écartés` sans scope nouvellement capé. Attendre validation.
+Add `Required information: <missing>` if no representative workload is available. Omit the `Excluded` line when there is no newly capped scope. Wait for validation.
 
 ## `selection:coverage-stop`
 
 ```text
-Couverture performance matérielle atteinte — aucune cible matérielle restante.
+Material performance coverage reached — no material target remains.
 
-Écartés (exposure-capped) : <scope> — <calcul court> ; ...
-Froids inchangés depuis leur dernier audit : <scope> (<date>) ; ...
-Pendings actionnables : <n, ou « aucun »>
+Excluded (exposure-capped): <scope> — <short calculation>; ...
+Cold and unchanged since their last audit: <scope> (<date>); ...
+Actionable pending findings: <n, or "none">
 
-Quelle opération te semble lente à l'usage ? Une description (`feature <...>`) ou un path lance un audit ciblé ; un changement d'environnement ou de dépendances justifie une re-mesure (`update`).
+Which operation feels slow in use? A description (`feature <...>`) or path launches a targeted audit; an environment or dependency change justifies remeasurement (`update`).
 
-Files mis à jour : <STATE_DIR>/performance_history.md (+<k> lignes skipped) [ou « aucun »].
+Files updated: <STATE_DIR>/performance_history.md (+<k> skipped lines) [or "none"].
 ```
 
-Omettre les lignes vides. En orchestration `performance-cycle`, ce template fournit le motif d'arrêt anticipé du récap de campagne.
+Omit empty lines. Under `performance-cycle` orchestration, this template supplies the early-stop reason in the campaign summary.
 
 ## `audit:summary`
 
 ```text
-Audit performance terminé — <scope>
+Performance audit complete — <scope>
 
-Workload : <résumé>
-Baseline : <métrique + valeur + dispersion + environnement court>
+Workload: <summary>
+Baseline: <metric + value + dispersion + short environment>
 
-<N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
-  <ID> (<SEV>, <axe>) — <observation courte> — <preuve courte>
+<N> new findings (<X> HIGH, <Y> MED, <Z> LOW):
+  <ID> (<SEV>, <axis>) — <short observation> — <short evidence>
 
-Files mis à jour : <STATE_DIR>/performance_findings.md (+<N>), <STATE_DIR>/performance_history.md (+1 ligne[, +<k> lignes skipped]).
+Files updated: <STATE_DIR>/performance_findings.md (+<N>), <STATE_DIR>/performance_history.md (+1 line[, +<k> skipped lines]).
 ```
 
-Suivre avec `audit:proposition`.
+Follow with `audit:proposition`.
 
 ## `audit:clean`
 
 ```text
-Audit performance terminé — <scope>. Mesure valide, aucun bottleneck actionnable sur ce workload.
+Performance audit complete — <scope>. Valid measurement, no actionable bottleneck on this workload.
 
-Workload : <résumé>
-Résultat : <métrique + valeur + dispersion> [budget : <budget respecté>]
-Hypothèses réfutées : <hypothèse — mesure courte> ; ...
+Workload: <summary>
+Result: <metric + value + dispersion> [budget: <budget met>]
+Refuted hypotheses: <hypothesis — short measurement>; ...
 
-Files mis à jour : <STATE_DIR>/performance_history.md (+1 ligne `0 findings (clean)`[, +<k> lignes skipped]).
+Files updated: <STATE_DIR>/performance_history.md (+1 `0 findings (clean)` line[, +<k> skipped lines]).
 ```
 
-Omettre la ligne `Hypothèses réfutées` si le triage n'en avait rattaché aucune à la cible.
+Omit the `Refuted hypotheses` line if triage attached none to the target.
 
 ## `audit:inconclusive`
 
 ```text
-Audit performance inconclusif — <scope>
+Performance audit inconclusive — <scope>
 
-Cause : <workload absent | variance instable | attribution insuffisante | environnement non sûr | autre>
-Pour conclure : <information ou condition précise>
+Cause: <missing workload | unstable variance | insufficient attribution | unsafe environment | other>
+To conclude: <specific information or condition>
 
-Files mis à jour : <STATE_DIR>/performance_history.md (+1 ligne `0 findings (inconclusive: <raison>)`).
+Files updated: <STATE_DIR>/performance_history.md (+1 `0 findings (inconclusive: <reason>)` line).
 ```
 
-Ne jamais appeler ce résultat `clean`.
+Never call this result `clean`.
 
 ## `audit:proposition`
 
 ```text
-Prochaine étape proposée : double-check <ID-prioritaire> — <raison : sévérité, exposition ou preuve à confirmer>.
-Sinon : double-check un autre ID ou garder les findings pending.
+Proposed next step: double-check <priority-ID> — <reason: severity, exposure, or evidence to confirm>.
+Otherwise: double-check another ID or keep the findings pending.
 ```
 
 ## `list:dashboard`
 
 ```text
-Performance board — <projet>
+Performance board — <project>
 
-Pending actionnables (<total>) :
-  HIGH (<n>) : <ID> (<scope>, <métrique/baseline>, <observation courte>)
-  MED  (<n>) : ...
-  LOW  (<n>) : ...
+Actionable pending findings (<total>):
+  HIGH (<n>): <ID> (<scope>, <metric/baseline>, <short observation>)
+  MED  (<n>): ...
+  LOW  (<n>): ...
 
-Stale / blocked (<n>) :
-  <ID> — <status et cause>
+Stale / blocked (<n>):
+  <ID> — <status and cause>
 
-Recently resolved (30 derniers jours) :
-  <ID> (<SEV>) — <date> — <gain avant/après>
+Recently resolved (last 30 days):
+  <ID> (<SEV>) — <date> — <before/after gain>
 
-Rolling (N=<N>) :
-  <date> — <scope> — <résultat>
+Rolling (N=<N>):
+  <date> — <scope> — <result>
 
-Écartés (exposure-capped) : <scope> — <calcul court> ; ...
+Excluded (exposure-capped): <scope> — <short calculation>; ...
 
-Prochaine étape : <double-check ID | update | nouvel audit> — <raison>.
+Next step: <double-check ID | update | new audit> — <reason>.
 ```
 
-Omettre `Stale / blocked` si vide. Si zéro résolu, écrire `Aucun résolu dans les 30 derniers jours.` Si zéro pending, l'indiquer sans lignes de sévérité. Omettre `Écartés` si l'history ne contient aucune ligne `skipped`.
+Omit `Stale / blocked` if empty. If zero resolved, write `None resolved in the last 30 days.` If zero pending, state it without severity lines. Omit `Excluded` if history contains no `skipped` line.
 
 ## `update:summary`
 
 ```text
-Update performance terminé — <projet>
+Performance update complete — <project>
 
-Re-mesuré <N>/<total> pendings :
-  Résolus (<n>) : <IDs avec avant → après>
-  Toujours présents (<n>) : <IDs>
-  Régressés (<n>) : <IDs avec mesure>
-  Non comparables (<n>) : <IDs avec cause>
-  Relocalisés (<n>) : <ID old → new>
-  Stale (<n>) : <IDs>
-  Blocked (<n>) : <IDs>
+Remeasured <N>/<total> pending findings:
+  Resolved (<n>): <IDs with before → after>
+  Still present (<n>): <IDs>
+  Regressed (<n>): <IDs with measurement>
+  Non-comparable (<n>): <IDs with cause>
+  Relocated (<n>): <ID old → new>
+  Stale (<n>): <IDs>
+  Blocked (<n>): <IDs>
 
-Files mis à jour : <liste exacte des fichiers d'état modifiés>.
+Files updated: <exact list of modified state files>.
 ```
 
-Omettre les catégories à zéro. Si certains workloads n'ont pas été lancés, préciser lesquels et pourquoi.
+Omit zero-count categories. If some workloads were not run, state which ones and why.
 
 ## `double-check:output`
 
 ```text
 Double-check <ID> — <verdict>
 
-Reproduction : <baseline initiale → mesure actuelle, dispersion, comparabilité>
-Attribution : <profil/expérience>
-Blast radius : <call sites, tests, surfaces>
-Risques : <correction, mémoire/I-O/concurrence, maintenabilité>
-Effort : <S|M|L>
-Acceptation affinée : <critère>
-Plan affiné : <recommandation>
-Verdict : <GO|GO-mais-après-X|NO-GO|INCONCLUSIF>
+Reproduction: <initial baseline → current measurement, dispersion, comparability>
+Attribution: <profile/experiment>
+Blast radius: <call sites, tests, surfaces>
+Risks: <correctness, memory/I-O/concurrency, maintainability>
+Effort: <S|M|L>
+Refined acceptance: <criterion>
+Refined plan: <recommendation>
+Verdict: <GO|GO-but-after-X|NO-GO|INCONCLUSIVE>
 
-Files mis à jour : <STATE_DIR>/performance_findings.md (Double-check ajouté[, sévérité/localisation amendée]).
+Files updated: <STATE_DIR>/performance_findings.md (Double-check added[, severity/location amended]).
 ```
 
 ## `double-check:proposition`
 
-GO / GO-mais-après-X :
+GO / GO-but-after-X:
 
 ```text
-Que faire pour <ID> ?
-  (a) Fix maintenant — plan, OK explicite, tests, benchmark avant/après et garde-fou maintenabilité.
-  (b) Plus tard — le Double-check reste dans le board.
+What should be done for <ID>?
+  (a) Fix now — plan, explicit OK, tests, before/after benchmark, and maintainability guardrail.
+  (b) Later — the Double-check remains on the board.
 ```
 
-NO-GO :
+NO-GO:
 
 ```text
-Verdict NO-GO. Archiver <ID> avec le motif, ou le garder pending ?
+NO-GO verdict. Archive <ID> with the reason, or keep it pending?
 ```
 
-INCONCLUSIF :
+INCONCLUSIVE:
 
 ```text
-Pas de fix proposé : il manque <condition>. <ID> reste pending.
+No fix proposed: <condition> is missing. <ID> remains pending.
 ```
 
 ## `resolution:confirm`
 
 ```text
-<ID> satisfait l'acceptation : <avant> → <après> (<gain>, dispersion <valeur>), tests OK, garde-fou maintenabilité OK. Je marque comme résolu ?
+<ID> meets acceptance: <before> → <after> (<gain>, dispersion <value>), tests OK, maintainability guardrail OK. Should I mark it resolved?
 ```
 
 ## `resolution:done`
 
 ```text
-Résolution performance terminée — <ID> : <avant> → <après> (<gain>).
+Performance resolution complete — <ID>: <before> → <after> (<gain>).
 
-Files mis à jour : <STATE_DIR>/performance_findings.md (move <ID> → Resolved), <STATE_DIR>/performance_history.md (résolu <ID>)[, <STATE_DIR>/performance_resolved_archive.md].
+Files updated: <STATE_DIR>/performance_findings.md (move <ID> → Resolved), <STATE_DIR>/performance_history.md (resolved <ID>)[, <STATE_DIR>/performance_resolved_archive.md].
 ```
 
 ## `resolution:failed`
 
 ```text
-Fix non validé — <ID> reste pending.
+Fix not validated — <ID> remains pending.
 
-Cause : <tests KO | gain absent | résultat dans la variance | dette de maintenabilité injustifiée>
-Mesure : <avant> → <après, dispersion>
-Fichiers modifiés : <liste des fichiers touchés par le fix>
-Diff conservé dans l'arbre de travail pour review ; aucun statut de résolution écrit.
-Pour le mettre de côté : `git stash push -- <fichiers>` (non exécuté).
+Cause: <tests failed | no gain | result within variance | unjustified maintainability debt>
+Measurement: <before> → <after, dispersion>
+Modified files: <list of files touched by the fix>
+Diff kept in the worktree for review; no resolution status written.
+To set it aside: `git stash push -- <files>` (not executed).
 ```

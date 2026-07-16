@@ -6,99 +6,99 @@ description: "Aggressively remove redundant, stale, or AI-generated code comment
 
 # Doc-cleanup skill
 
-Nettoyage **agressif** de la documentation de code : supprimer le bruit (commentaires qui paraphrasent le code), rendre le code auto-documenté par renommage, et fiabiliser le peu qui reste (corriger le drift). Le livrable est le **code nettoyé** dans l'arbre de travail, pas un rapport.
+Aggressively clean code documentation: remove noise (comments that paraphrase code), make code self-documenting through renames, and make the few surviving comments reliable (correct drift). The deliverable is **cleaned code** in the worktree, not a report.
 
-## Frontière
+## Boundary
 
-Exécuter le nettoyage demandé dans le code. Pour un audit structurel (duplication, code mort, god files, couplage, architecture), utiliser le skill `maintainability` : il *diagnostique et suit* des findings, tandis que ce skill *modifie* la couche documentation.
+Perform the requested cleanup in code. For a structural audit (duplication, dead code, god files, coupling, architecture), use the `maintainability` skill: it *diagnoses and tracks* findings, while this skill *modifies* the documentation layer.
 
-## Références
+## References
 
-Ce SKILL.md est un **routeur mince** : il fixe le mode, les conventions transverses et pointe vers le playbook. Les détails normatifs vivent dans `references/`, chargées **à la demande** :
+This SKILL.md is a **thin router**: it selects the mode, defines cross-cutting conventions, and points to the playbook. Normative details live in `references/` and are loaded **on demand**:
 
-**Doctrine (le cœur — à lire avant tout nettoyage, quel que soit le mode)** :
+**Doctrine (the core—read before any cleanup, in every mode)**:
 
-- `references/doctrine.md` — la posture agressive, l'heuristique « *what* = bruit / *why* = on garde », les 3 verbes (SUPPRIMER / RENOMMER / GARDER+dé-drifter), la liste indicative de ce qui se supprime à vue, l'allowlist de ce qui survit, et les garde-fous (quand NE PAS toucher). **Sans cette lecture, le nettoyage dérive** — soit trop timide (le défaut d'un agent), soit destructeur.
+- `references/doctrine.md` — the aggressive stance, the “*what* = noise / *why* = keep” heuristic, the 3 verbs (DELETE / RENAME / KEEP+de-drift), the indicative delete-on-sight list, the survivor allowlist, and guardrails (when NOT to touch). **Without this reading, cleanup drifts**—either too timid (an agent's default) or destructive.
 
-**Playbooks de mode (lire et exécuter celui du mode courant)** :
+**Mode playbooks (read and execute the current mode's playbook)**:
 
-- `references/mode-project.md` — campagne globale : bootstrap, inventaire des zones, ledger de couverture, boucle de campagne, reprise.
-- `references/mode-zone.md` — nettoyage d'un path unique (ou sélection auto d'une zone).
-- `references/mode-session.md` — sélection par diff git, switch `--touched`, ou liste explicite `--files` pour un orchestrateur.
+- `references/mode-project.md` — global campaign: bootstrap, zone inventory, coverage ledger, campaign loop, resume.
+- `references/mode-zone.md` — clean a single path (or auto-select a zone).
+- `references/mode-session.md` — git-diff selection, `--touched`, or an explicit `--files` list for an orchestrator.
 
-**Orchestration et formats (chargées quand on fan-out ou qu'on écrit l'état)** :
+**Orchestration and formats (load when fanning out or writing state)**:
 
-- `references/orchestration.md` — stratégie de sous-agents quand cette capacité est disponible (fan-out vs main-loop), fallback séquentiel, sécurité des renames, granularité de validation et briefing d'un agent de zone. Partagée par `project` et par `zone` quand la zone est grosse.
-- `references/file-formats.md` — format du ledger de couverture (`<STATE_DIR>/doccleanup_coverage.md`) et templates de sortie chat.
+- `references/orchestration.md` — subagent strategy when available (fan-out vs main-loop), sequential fallback, rename safety, validation granularity, and zone-agent briefing. Shared by `project` and by `zone` for large zones.
+- `references/file-formats.md` — coverage-ledger format (`<STATE_DIR>/doccleanup_coverage.md`) and chat-output templates.
 
-## Dispatch des modes
+## Mode dispatch
 
-Déduire le mode de la requête utilisateur, indépendamment de la syntaxe d'invocation de l'agent :
+Infer the mode from the user's request, independently of the agent invocation syntax:
 
-| Intention de la requête | Mode | Playbook | Entrée attendue |
+| Request intent | Mode | Playbook | Expected input |
 |---|---|---|---|
-| Nettoyer une zone, sans chemin | **zone auto** | `references/mode-zone.md` | Inventorier, proposer une zone, la faire valider, puis nettoyer. |
-| Nettoyer une zone avec chemin | **zone forcée** | `references/mode-zone.md` | Chemin existant, fichier ou dossier. |
-| Nettoyer tout le projet | **project** | `references/mode-project.md` | Aucun argument supplémentaire. |
-| Nettoyer les fichiers de la session | **session** | `references/mode-session.md` | Option `--touched` éventuelle. |
-| Nettoyer une liste explicite de fichiers touchés | **session explicite** | `references/mode-session.md` | `--files <path>...` ; incompatible avec `--touched`. |
+| Clean a zone, without a path | **zone (auto)** | `references/mode-zone.md` | Inventory, propose a zone, obtain approval, then clean it. |
+| Clean a zone with a path | **zone (forced)** | `references/mode-zone.md` | Existing file or directory path. |
+| Clean the entire project | **project** | `references/mode-project.md` | No additional argument. |
+| Clean session files | **session** | `references/mode-session.md` | Optional `--touched`. |
+| Clean an explicit list of touched files | **session (explicit)** | `references/mode-session.md` | `--files <path>...`; incompatible with `--touched`. |
 
-Accepter comme aliases de compatibilité `/doccleanup`, `/doccleanup-project` et `/doccleanup-session`. Avec Codex, les formulations équivalentes sont par exemple `$doc-cleanup sur src/`, `$doc-cleanup sur tout le projet`, `$doc-cleanup sur les fichiers touchés --touched` et `$doc-cleanup session sur la liste explicite de fichiers suivante`. Si le skill est invoqué explicitement sans précision, choisir **zone auto**.
+Accept `/doccleanup`, `/doccleanup-project`, and `/doccleanup-session` as compatibility aliases. With Codex, equivalent phrasings include `$doc-cleanup sur src/`, `$doc-cleanup sur tout le projet`, `$doc-cleanup sur les fichiers touchés --touched`, and `$doc-cleanup session sur la liste explicite de fichiers suivante`. If the skill is invoked explicitly without details, choose **zone (auto)**.
 
-**Procédure de dispatch** : (1) vérifier le root projet ; (2) résoudre `<STATE_DIR>` ; (3) valider l'entrée restante de la requête — demander une clarification uniquement pour un chemin inexistant ou un flag inconnu ; (4) lire `references/doctrine.md` ; (5) lire et exécuter le playbook du mode. Ne jamais dépendre d'une variable propre à un agent telle que `$ARGUMENTS`.
+**Dispatch procedure**: (1) verify the project root; (2) resolve `<STATE_DIR>`; (3) validate the remaining request input—ask for clarification only for a nonexistent path or unknown flag; (4) read `references/doctrine.md`; (5) read and execute the mode playbook. Never depend on an agent-specific variable such as `$ARGUMENTS`.
 
-## Détection du root projet
+## Project-root detection
 
-Avant tout dispatch, confirmer que `cwd` est la racine d'un projet :
+Before dispatching, confirm that `cwd` is a project root:
 
-1. Chercher un marqueur dans le `cwd` : `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/`, `.svn/`.
-2. **Trouvé** → continuer.
-3. **Absent** → remonter dans les parents jusqu'à un marqueur (ou la racine du filesystem).
-4. **Trouvé dans un parent** : annoncer *"Le root projet semble être `<parent>`, mais le `cwd` est `<cwd>`. Relance depuis `<parent>` ou confirme ici (l'état sera créé dans le projet confirmé)."* et attendre.
-5. **Aucun marqueur** : abort avec *"Aucun marqueur de projet détecté. Lance la commande depuis la racine d'un projet."*
+1. Look for a marker in `cwd`: `.git/`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `Gemfile`, `pom.xml`, `build.gradle`, `.hg/`, `.svn/`.
+2. **Found** → continue.
+3. **Absent** → walk up through parents until a marker (or filesystem root).
+4. **Found in a parent**: announce *"The project root appears to be `<parent>`, but `cwd` is `<cwd>`. Rerun from `<parent>` or confirm here (state will be created in the confirmed project)."* and wait.
+5. **No marker**: abort with *"No project marker detected. Run the command from a project root."*
 
-Si l'utilisateur passe un `<path>` (mode zone forcée), le path est le scope et l'état est rattaché au marqueur de root le plus proche.
+If the user supplies a `<path>` (forced-zone mode), the path is the scope and state is attached to the nearest root marker.
 
-## Répertoire d'état
+## State directory
 
-`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, partagé entre Claude Code et Codex. Le créer uniquement lorsqu'un mode doit écrire.
+`<STATE_DIR>` = `<PROJECT_ROOT>/.code-quality`, shared by Claude Code and Codex. Create it only when a mode must write.
 
-Dans toutes les références de ce skill, un nom de fichier d'état non qualifié tel que `doccleanup_coverage.md` désigne toujours `<STATE_DIR>/doccleanup_coverage.md`.
+Throughout this skill's references, an unqualified state filename such as `doccleanup_coverage.md` always means `<STATE_DIR>/doccleanup_coverage.md`.
 
-## Conventions transverses (tous modes)
+## Cross-cutting conventions (all modes)
 
-Ces règles s'appliquent à **chaque** mode, elles ne sont pas répétées dans les playbooks.
+These rules apply to **every** mode and are not repeated in the playbooks.
 
-1. **Git en lecture seule.** Le skill **édite librement l'arbre de travail** (c'est son produit), mais ne touche **jamais** à l'index ni à l'historique : `git log`/`diff`/`status`/`blame`/`show` autorisés ; `git add`/`commit`/`push`/`reset`/`checkout`/`restore` **interdits**. Les modifications restent non commitées — la review et le commit appartiennent à l'utilisateur. Le diff non commité **est** la surface de review du skill.
+1. **Read-only git.** The skill **freely edits the worktree** (that is its product), but **never** touches the index or history: `git log`/`diff`/`status`/`blame`/`show` are allowed; `git add`/`commit`/`push`/`reset`/`checkout`/`restore` are **forbidden**. Changes remain uncommitted—the user owns review and commit. The uncommitted diff **is** the skill's review surface.
 
-2. **Validation après chaque zone entièrement appliquée** (jamais par edit). Un rename touche N fichiers : la zone n'est valide qu'une fois les N faits. Détecter la commande de lint/test du projet (cf. `references/orchestration.md > Validation`) et la lancer à la fin de chaque zone. **Tests KO → ne pas passer à la zone suivante** : annoncer, et soit corriger, soit signaler que la zone reste dans un état partiel. Pas de setup de test détecté → l'annoncer et continuer en dégradé (compilation/lint seuls si dispo).
+2. **Validate after each fully applied zone** (never per edit). A rename touches N files: the zone is valid only after all N are done. Detect the project's lint/test command (see `references/orchestration.md > Validation`) and run it at the end of each zone. **Tests KO → do not proceed to the next zone**: announce it, then either fix it or report that the zone remains partial. No test setup detected → announce it and continue in degraded mode (compile/lint only, if available).
 
-3. **Date déterministe.** Toute date écrite dans l'état (`<STATE_DIR>/doccleanup_coverage.md`) vient de `date +%F`, jamais supposée de mémoire. Si `date` est indisponible, le signaler en chat plutôt qu'inventer.
+3. **Deterministic date.** Every date written to state (`<STATE_DIR>/doccleanup_coverage.md`) comes from `date +%F`, never from memory. If `date` is unavailable, report that in chat rather than inventing one.
 
-4. **Écritures en delta.** Avant d'écrire le ledger de couverture, le relire juste avant et **préfixer la nouvelle ligne** en tête, sans régénérer le fichier (il peut avoir été édité à la main).
+4. **Delta writes.** Immediately before writing the coverage ledger, reread it and **prepend the new line** at the top without regenerating the file (it may have been edited manually).
 
-5. **Pas de big-bang silencieux sur les renames.** Le nettoyage par suppression s'applique directement (le diff non commité est la review). Les **renames** ont un blast radius inter-fichiers : chaque rename est précédé d'un grep des références (cf. `references/doctrine.md` et `references/orchestration.md`) et **listé explicitement** dans la sortie de zone.
+5. **No silent big-bang renames.** Deletion cleanup is applied directly (the uncommitted diff is the review). **Renames** have a cross-file blast radius: each rename is preceded by a reference grep (see `references/doctrine.md` and `references/orchestration.md`) and **explicitly listed** in the zone output.
 
-## Doctrine — à charger avant tout nettoyage
+## Doctrine—load before any cleanup
 
-`references/doctrine.md` **doit** être lue au début de chaque mode : elle porte la calibration qui fait ou défait le skill (cf. son descriptif dans *Références*). Aucun mode ne produit d'edit sans l'avoir chargée.
+`references/doctrine.md` **must** be read at the start of every mode: it contains the calibration that makes or breaks the skill (see its description in *References*). No mode may produce an edit without loading it.
 
-## Sorties chat — conventions
+## Chat-output conventions
 
-Les sorties suivent des templates nommés définis dans `references/file-formats.md > Templates`. Conventions transverses :
+Outputs follow the named templates defined in `references/file-formats.md > Templates`. Cross-cutting conventions:
 
-- **Header** : `<Mode> terminé — <scope>`.
-- **Trailer** « Files mis à jour : … » présent dès qu'on écrit le ledger ; mention des fichiers source nettoyés via leur compte, pas leur liste exhaustive (le diff git porte le détail).
-- **Stats normalisées** : `<N> commentaires supprimés, <M> renames, <K> docs dé-driftées`.
-- Le bloc de proposition d'action (lancer la campagne, continuer, etc.) est séparé du récap.
+- **Header**: `<Mode> complete — <scope>`.
+- **Trailer** “Files updated: …” whenever the ledger is written; mention cleaned source files by count, not by exhaustive list (the git diff carries the details).
+- **Normalized stats**: `<N> comments deleted, <M> renames, <K> docs de-drifted`.
+- Separate the proposed-action block (launch campaign, continue, etc.) from the summary.
 
-## Invariants de fin de mode
+## End-of-mode invariants
 
-Avant de rendre la main, valider que toutes les écritures attendues du mode ont eu lieu (une case **non applicable** est considérée cochée) :
+Before returning control, verify that all expected mode writes occurred (a **not applicable** item counts as checked):
 
-- Ledger `<STATE_DIR>/doccleanup_coverage.md` mis à jour (une ligne par zone/passe nettoyée).
-- Validation lancée et son résultat reporté (ou dégradation annoncée).
-- Renames listés dans la sortie.
-- Aucun `git add`/`commit` effectué.
+- Ledger `<STATE_DIR>/doccleanup_coverage.md` updated (one line per cleaned zone/pass).
+- Validation run and result reported (or degradation announced).
+- Renames listed in output.
+- No `git add`/`commit` performed.
 
-**Si une case n'a pas pu être cochée** (tests KO, pas de setup, fichier en lecture seule), **l'annoncer en chat** plutôt que rendre la main silencieusement — l'utilisateur doit savoir qu'un état partiel existe. La checklist détaillée propre à chaque mode vit en fin de son playbook.
+**If an item could not be checked** (tests KO, no setup, read-only file), **announce it in chat** rather than silently returning control—the user must know partial state exists. Each mode's detailed checklist is at the end of its playbook.
