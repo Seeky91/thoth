@@ -6,6 +6,7 @@ Référence normative à lire avant tout audit, double-check, update ou fix. Ell
 
 - Contrat du workload
 - Hiérarchie de preuve
+- Hypothèses, exposition et matérialité
 - Mesures comparables
 - Axes et sévérité
 - Quand ne pas produire de finding
@@ -36,6 +37,31 @@ Utiliser les signaux dans cet ordre :
 4. **Inspection statique** : complexité algorithmique, copies, appels I/O ou verrous visibles. Sert à formuler une hypothèse, jamais à prouver seule un finding.
 
 Un finding persistant exige au minimum les niveaux 1 et 2, sauf impossibilité intrinsèque de profiler démontrée. Dans ce cas, une expérience contrôlée de niveau 3 peut remplacer le profil si elle attribue clairement le coût. Sans attribution suffisante, écrire un audit `inconclusif`, pas un finding.
+
+## Hypothèses, exposition et matérialité
+
+La preuve de performance habite l'exécution ; le **ciblage**, lui, habite la couche statique. Trois étages épistémiques, du moins cher au plus cher :
+
+1. **Hypothèse** — supposition issue de la lecture du code et du raisonnement d'exposition. Elle porte une localisation, un mécanisme suspecté, une exposition sourcée et l'expérience minimale qui la falsifierait. Elle sert à classer les cibles et à orienter le plan de mesure ; elle n'a pas d'ID, n'entre jamais dans le board et ne se présente jamais comme un problème avéré.
+2. **Finding** — hypothèse confirmée par la hiérarchie de preuve (mesure + attribution). Seuil inchangé.
+3. **Verdict** — finding re-vérifié par double-check avant tout fix.
+
+### Raisonnement d'exposition
+
+L'exposition s'estime **depuis des preuves**, jamais de mémoire : configs et cadences observables (intervalle de tick, fréquence d'un heartbeat, cron), tailles et bornes des données réelles, commandes versionnées (Makefile, scripts, CI), documentation, et qui attend concrètement sur l'opération (opérateur, utilisateur final, pipeline). Ne jamais fabriquer de chiffres : une exposition sans preuve se déclare indéterminable. Côté coût, la lecture statique ne fournit qu'un **ordre de grandeur plausible** — caches, compilateurs et tailles réelles déjouent l'intuition ; conclure un coût reste le rôle exclusif de la mesure.
+
+### Matérialité plausible
+
+Matérialité plausible d'une cible = exposition sourcée × ordre de grandeur de coût plausible :
+
+- **forte** — opération que quelqu'un attend réellement et souvent, ou coût croissant avec des données non bornées ;
+- **moyenne** — exposition réelle mais modérée, ou coût plausible incertain sans plafond démontrable ;
+- **capée (exposure-capped)** — un plafond structurel d'exposition borne tout gain plausible sous la matérialité, calcul explicite à l'appui (ex. : migration 1×/lancement × quelques ms majorées ; boucle ~1 Hz × coût ns-µs). Mesurer un scope capé ne pourrait produire aucun finding quel que soit le résultat : il se consigne sans harnais ;
+- **indéterminable** — aucune preuve d'exposition disponible ; à déclarer, jamais à deviner.
+
+### La réfutation est un résultat de première classe
+
+Une hypothèse mesurée puis réfutée, ou un scope capé consigné avec son calcul, valent un audit réussi : ils documentent où le temps ne se perd pas. Ne pas produire de finding de consolation, et ne pas relancer un harnais pour re-démontrer un plafond déjà consigné dont ni le code ni l'exposition n'ont changé.
 
 ## Mesures comparables
 
@@ -109,7 +135,7 @@ Préférer dans cet ordre :
 3. outils système présents (`hyperfine`, `/usr/bin/time`, `perf`, profilers de mémoire/I/O) ;
 4. harness éphémère sous `/tmp` si le scénario reste représentatif et ne modifie pas le projet.
 
-Détecter les outils opportunément et s'adapter au langage. Ne pas installer de dépendance ou contacter un service externe sans autorisation. Exécuter l'outil et exploiter sa sortie ; ne pas lire son code source. Un outil absent dégrade la profondeur, jamais les exigences de preuve.
+Détecter les outils opportunément et s'adapter au langage. Ne pas installer de dépendance ou contacter un service externe sans autorisation. Un outil absent dégrade la profondeur, jamais les exigences de preuve.
 
 ## Workloads client et navigateur
 

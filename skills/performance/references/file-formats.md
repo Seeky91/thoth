@@ -19,18 +19,21 @@ Journal append-only, nouvelle ligne préfixée en tête :
 # Performance audit history
 
 - 2026-07-15 — feature:checkout [src/checkout, src/db/orders] — 2 findings (1 HIGH, 1 MED) (pending) — metric: p95 latency — workload: `make bench-checkout`
-- 2026-07-10 — src/serializer/ — 0 findings (clean) — metric: throughput — workload: `cargo bench serializer`
+- 2026-07-10 — src/serializer/ — 0 findings (clean — throughput dans le budget, hypothèse re-parse par appel réfutée) — metric: throughput — workload: `cargo bench serializer`
+- 2026-07-08 — src/db/migrations/ — skipped (exposure-capped: 1×/déploiement × ~10 ms plausibles majorés)
 - 2026-07-02 — feature:search [src/search] — 0 findings (inconclusive: variance instable) — workload: `pytest tests/test_search.py`
 ```
 
 Règles :
 
-- Format : `- YYYY-MM-DD — <scope> — <résultat> — metric: <métrique> — workload: <commande sanitisée>`.
+- Format : `- YYYY-MM-DD — <scope> — <résultat> — metric: <métrique> — workload: <commande sanitisée>`. Une ligne `skipped` n'a ni metric ni workload (aucune mesure) : `- YYYY-MM-DD — <scope> — skipped (exposure-capped: <calcul court>)`.
 - `<scope>` = path ou `feature:<description-courte> [paths principaux]`.
 - L'identité d'une scope `feature:` est portée par les paths entre crochets, pas par le texte libre : deux lignes dont les paths se recouvrent matériellement désignent la même scope même si la description diffère. Avant d'écrire une nouvelle ligne feature, réutiliser la description exacte d'une ligne existante qui matche par les paths.
-- Résultat = `N findings (...) (pending|résolus ...)`, `0 findings (clean)` ou `0 findings (inconclusive: <raison>)`.
+- Résultat = `N findings (...) (pending|résolus ...)`, `0 findings (clean[ — <justification>])`, `0 findings (inconclusive: <raison>)` ou `skipped (exposure-capped: <calcul>)`.
+- La parenthèse de résultat tient en **une phrase courte**. Le détail d'un finding vit dans `performance_findings.md` ; une ligne `clean` porte au plus la métrique dominante, la raison d'immatérialité et les hypothèses réfutées.
+- Une ligne `skipped` n'est pas un audit : la scope ne compte ni dans le rolling ni comme couverte par une mesure. Elle bloque la re-proposition auto du scope tant que ni son code ni son exposition n'ont changé ; ne pas la dupliquer si le calcul est inchangé.
 - Une même scope peut apparaître plusieurs fois ; retrouver l'audit d'origine par la paire exacte date + scope.
-- L'historique n'est jamais trimmé. Le rolling est une vue sur les 4 premières scopes, override possible avec `<!-- rolling_size: N -->`. La taille est fixe — contrairement au `N` calculé de `maintainability` — parce que l'inventaire performance compte peu de scopes réellement exerçables ; un calcul proportionnel n'apporterait rien.
+- L'historique n'est jamais trimmé. Le rolling est une vue sur les 4 premières scopes **auditées** (lignes `skipped` ignorées), override possible avec `<!-- rolling_size: N -->`.
 - Une ligne inconclusive mémorise la tentative mais ne prouve pas que la scope est propre.
 
 ## `performance_findings.md`

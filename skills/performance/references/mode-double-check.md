@@ -5,10 +5,10 @@ Référence chargée avec un ID `PERF-NNN`. Lire `references/doctrine.md`, `refe
 ## Flux d'analyse
 
 1. Localiser l'entrée dans `## Pending`. ID absent, résolu ou invalide : demander un ID pending valide.
-2. Rejouer le workload et protocole enregistrés aussi près que possible de la baseline.
+2. Rejouer le workload et protocole enregistrés aussi près que possible de la baseline. **Clause same-session** : si la baseline (et le profil) viennent d'être mesurés dans la même session et que ni le code du scope, ni le workload, ni l'environnement n'ont changé depuis, les réutiliser au lieu de re-mesurer et le déclarer dans la bullet (`reproduction : baseline same-session réutilisée`) ; le double-check se concentre alors sur l'attribution alternative, le blast radius, les risques et l'acceptation. Au moindre doute sur un de ces invariants, re-mesurer.
 3. Vérifier la comparabilité et la variance. Si la baseline ne se reproduit pas au-delà de la dispersion attendue, chercher la cause avant toute recommandation.
 4. Lire tous les paths du scope, les call sites, tests et frontières I/O impliqués.
-5. Re-profiler le workload et confirmer que le coût attribué reste dominant.
+5. Re-profiler le workload et confirmer que le coût attribué reste dominant — sauf réutilisation same-session d'un profil frais.
 6. Tester l'hypothèse sans modifier le projet si possible : option runtime, expérience contrôlée, requête isolée ou harness sous `/tmp`. Une modification source appartient au flux de fix après confirmation.
 7. Évaluer :
    - reproductibilité de la baseline ;
@@ -64,7 +64,7 @@ Garder Pending. Expliquer la mesure, donnée ou condition qui manque ; ne pas pr
 
 ## Invariants de fin de mode
 
-- Baseline rejouée ou impossibilité explicitement documentée.
+- Baseline rejouée, réutilisée via la clause same-session (déclarée), ou impossibilité explicitement documentée.
 - Attribution re-vérifiée avec profil ou expérience.
 - Section Double-check écrite en delta.
 - Verdict cohérent avec la qualité de preuve.

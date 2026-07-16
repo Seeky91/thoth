@@ -8,7 +8,7 @@ Référence chargée en mode **list**. Lecture seule stricte : ne pas mesurer, n
 2. Compter les Pending par sévérité et résumer pour chacun : ID, axe, scope, métrique/baseline et observation courte.
 3. Lister séparément les `stale` et `blocked`, tout en les gardant dans le total Pending.
 4. Lister les résolutions des 30 derniers jours depuis la section `## Resolved`. Ne pas charger l'archive ; si les 8 entrées du cap sont toutes dans la fenêtre, signaler que la vue peut être tronquée.
-5. Afficher le rolling des N dernières scopes (`N=4`, ou override `<!-- rolling_size: N -->`).
+5. Afficher le rolling des N dernières scopes auditées (`N=4`, ou override `<!-- rolling_size: N -->`) ; les lignes `skipped` n'y comptent pas. Mentionner sur une ligne les scopes `skipped (exposure-capped)` présents dans l'history, avec leur calcul.
 6. Recommander au plus un prochain geste :
    - finding HIGH/MED sans Double-check, baseline la plus récente d'abord → `double-check <ID>` ;
    - sinon finding GO déjà double-checké → reprendre son fix ;

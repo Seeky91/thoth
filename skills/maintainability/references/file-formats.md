@@ -12,7 +12,7 @@ Référence chargée par SKILL.md quand le skill doit lire ou écrire un fichier
 
 ### Pourquoi markdown (choix délibéré)
 
-L'état est en **markdown**, pas en JSON/binaire, **par choix** : lisible directement, **git-diffable** (chaque audit/résolution est un diff revue-able), et **éditable à la main** par l'utilisateur (le skill assume et anticipe cette édition — cf. *Compteur d'IDs > header absent* et la non-réutilisation d'ID après suppression manuelle). Un format opaque gagnerait un peu de robustesse de parsing mais perdrait ces trois propriétés, mauvais compromis pour un outil dont l'état doit rester inspectable. **Ne pas migrer vers JSON.** La robustesse de parsing est obtenue autrement : schéma de bullets stable (ci-dessous), écritures en delta (*SKILL.md > Conventions transverses*), et self-heal des compteurs.
+L'état est en **markdown**, pas en JSON/binaire, **par choix** : lisible directement, **git-diffable** (chaque audit/résolution est un diff revue-able), et **éditable à la main** par l'utilisateur (le skill assume et anticipe cette édition — cf. *Compteur d'IDs > header absent* et la non-réutilisation d'ID après suppression manuelle). Un format opaque gagnerait un peu de robustesse de parsing mais perdrait ces trois propriétés, mauvais compromis pour un outil dont l'état doit rester inspectable. La robustesse de parsing est obtenue autrement : schéma de bullets stable (ci-dessous), écritures en delta (*SKILL.md > Conventions transverses*), et self-heal des compteurs.
 
 ## `<STATE_DIR>/maintainability_history.md`
 

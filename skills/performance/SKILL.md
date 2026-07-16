@@ -18,8 +18,8 @@ Inclure la latence, le throughput, CPU, mémoire/allocations, I/O, contention/co
 
 Ce `SKILL.md` est un **routeur mince**. Lire les références requises par le mode courant, sans charger les autres :
 
-- `references/doctrine.md` — contrat de workload, hiérarchie de preuve, fiabilité des mesures, axes, sévérité, anti-bruit et garde-fou de maintenabilité. **Lire avant tout audit, double-check, update ou fix.**
-- `references/mode-audit.md` — bootstrap, inventaire et sélection automatique, audit ciblé par path ou feature, mesure, profiling et production des findings.
+- `references/doctrine.md` — contrat de workload, hiérarchie de preuve, hypothèses et raisonnement d'exposition, fiabilité des mesures, axes, sévérité, anti-bruit et garde-fou de maintenabilité. **Lire avant tout audit, double-check, update ou fix.**
+- `references/mode-audit.md` — bootstrap, inventaire, triage de matérialité et sélection automatique, audit ciblé par path ou feature, mesure, profiling et production des findings.
 - `references/mode-list.md` — tableau de bord lecture seule.
 - `references/mode-update.md` — re-mesure des pendings et gestion des workloads ou scopes devenus stales.
 - `references/mode-double-check.md` — reproduction approfondie, blast radius, verdict et résolution mesurée.
@@ -84,6 +84,8 @@ Le mode `list` ne crée rien.
 Lire `references/doctrine.md` avant toute décision. Invariants essentiels :
 
 - Un signal statique ou un profiler hit est un candidat, jamais un finding à lui seul.
+- La sélection auto classe par matérialité plausible (exposition sourcée × ordre de grandeur de coût), jamais par simple disponibilité d'un workload ; un scope au plafond d'exposition démontrable se consigne `skipped (exposure-capped)` sans harnais.
+- Une hypothèse réfutée par la mesure ou un plafond consigné est un audit réussi, pas un échec.
 - Un finding exige une baseline reproductible, une métrique, une exposition et une preuve reliant le coût à une localisation ou relation concrète.
 - Un gain inférieur au bruit de mesure n'est pas un gain.
 - Une optimisation qui dégrade inutilement correction ou maintenabilité est rejetée ou reformulée.

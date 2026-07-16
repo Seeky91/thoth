@@ -2,8 +2,6 @@
 
 Référence chargée par SKILL.md quand un fix déclenche la cascade (résolution intra-session, ou `fix B<n>` depuis `list`). But : détecter et tenir à jour les findings dont la localisation chevauche le diff du fix sans relancer un `update` complet.
 
-> La checklist d'invariants de fin de mode (auparavant hébergée ici) vit désormais dans SKILL.md — toujours en contexte, sans chargement supplémentaire.
-
 **Pas de cascade dans ces cas** :
 - Moves NO-GO (pas de fix, pas de diff).
 - Résolutions issues de `update` (déjà exhaustif par construction).

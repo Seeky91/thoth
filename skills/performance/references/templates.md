@@ -6,12 +6,30 @@ Lire avant chaque sortie d'un mode. Respecter la structure ; adapter uniquement 
 
 ```text
 Je propose : <scope> — <motif>
+Matérialité : <forte|moyenne> — <exposition sourcée × coût plausible>
 Workload : <commande/scénario sanitised>
 Métrique : <métrique primaire>
 Alternatives : <scope-alt-1> — <motif>, <scope-alt-2> — <motif>
+Écartés (exposure-capped) : <scope> — <calcul court> ; ...
 ```
 
-Ajouter `Information requise : <manque>` si aucun workload représentatif n'est disponible. Attendre validation.
+Ajouter `Information requise : <manque>` si aucun workload représentatif n'est disponible. Omettre la ligne `Écartés` sans scope nouvellement capé. Attendre validation.
+
+## `selection:coverage-stop`
+
+```text
+Couverture performance matérielle atteinte — aucune cible matérielle restante.
+
+Écartés (exposure-capped) : <scope> — <calcul court> ; ...
+Froids inchangés depuis leur dernier audit : <scope> (<date>) ; ...
+Pendings actionnables : <n, ou « aucun »>
+
+Quelle opération te semble lente à l'usage ? Une description (`feature <...>`) ou un path lance un audit ciblé ; un changement d'environnement ou de dépendances justifie une re-mesure (`update`).
+
+Files mis à jour : <STATE_DIR>/performance_history.md (+<k> lignes skipped) [ou « aucun »].
+```
+
+Omettre les lignes vides. En orchestration `performance-cycle`, ce template fournit le motif d'arrêt anticipé du récap de campagne.
 
 ## `audit:summary`
 
@@ -24,7 +42,7 @@ Baseline : <métrique + valeur + dispersion + environnement court>
 <N> nouveaux findings (<X> HIGH, <Y> MED, <Z> LOW) :
   <ID> (<SEV>, <axe>) — <observation courte> — <preuve courte>
 
-Files mis à jour : <STATE_DIR>/performance_findings.md (+<N>), <STATE_DIR>/performance_history.md (+1 ligne).
+Files mis à jour : <STATE_DIR>/performance_findings.md (+<N>), <STATE_DIR>/performance_history.md (+1 ligne[, +<k> lignes skipped]).
 ```
 
 Suivre avec `audit:proposition`.
@@ -36,9 +54,12 @@ Audit performance terminé — <scope>. Mesure valide, aucun bottleneck actionna
 
 Workload : <résumé>
 Résultat : <métrique + valeur + dispersion> [budget : <budget respecté>]
+Hypothèses réfutées : <hypothèse — mesure courte> ; ...
 
-Files mis à jour : <STATE_DIR>/performance_history.md (+1 ligne `0 findings (clean)`).
+Files mis à jour : <STATE_DIR>/performance_history.md (+1 ligne `0 findings (clean)`[, +<k> lignes skipped]).
 ```
+
+Omettre la ligne `Hypothèses réfutées` si le triage n'en avait rattaché aucune à la cible.
 
 ## `audit:inconclusive`
 
@@ -79,10 +100,12 @@ Recently resolved (30 derniers jours) :
 Rolling (N=<N>) :
   <date> — <scope> — <résultat>
 
+Écartés (exposure-capped) : <scope> — <calcul court> ; ...
+
 Prochaine étape : <double-check ID | update | nouvel audit> — <raison>.
 ```
 
-Omettre `Stale / blocked` si vide. Si zéro résolu, écrire `Aucun résolu dans les 30 derniers jours.` Si zéro pending, l'indiquer sans lignes de sévérité.
+Omettre `Stale / blocked` si vide. Si zéro résolu, écrire `Aucun résolu dans les 30 derniers jours.` Si zéro pending, l'indiquer sans lignes de sévérité. Omettre `Écartés` si l'history ne contient aucune ligne `skipped`.
 
 ## `update:summary`
 

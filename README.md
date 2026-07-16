@@ -50,10 +50,11 @@ Orchestration autonome d'un ou plusieurs cycles complets au sein d'un goal natif
 
 Orchestration autonome d'un ou plusieurs cycles mesurés au sein d'un goal natif : sélection d'un Pending ou d'un audit sûr, double-check obligatoire, fix d'un seul `PERF-NNN`, benchmark comparable avant/après et résolution du ledger.
 
-- un cycle par défaut, ou `N` cycles avec arrêt anticipé lorsqu'aucune hypothèse mesurable n'est actionnable ;
+- un cycle par défaut, ou `N` cycles avec arrêt anticipé lorsqu'aucune hypothèse mesurable n'est actionnable ou que la couverture matérielle est atteinte ;
 - une autorisation bornée aux workloads locaux, sûrs, courts et non ambigus, sans lever les protections de production ;
 - une optimisation unique par cycle pour conserver l'attribution du gain ;
-- des mesures, profils, builds et mutations strictement sérialisés, y compris avec des sous-agents.
+- des mesures, profils, builds et mutations strictement sérialisés, y compris avec des sous-agents ;
+- une unique clôture `doc-cleanup` sur les fichiers modifiés par la campagne.
 
 ### Skills atomiques
 
@@ -72,7 +73,7 @@ Audit, suivi et résolution contrôlée de la dette de maintenabilité : duplica
 
 Audit de performance fondé sur des mesures reproductibles : latence, throughput, CPU, mémoire, I/O, contention et scalabilité sous charge.
 
-- audit automatique ou ciblé par path/feature ;
+- audit automatique avec triage de matérialité — exposition sourcée avant tout harnais, scopes au plafond démontrable consignés sans mesure — ou ciblé par path/feature ;
 - contrat de workload, baseline, profiling et comparabilité ;
 - findings `PERF-NNN` persistants et tableau de bord ;
 - double-checks qui reproduisent la preuve, fixes validés par tests et benchmark avant/après.
@@ -135,6 +136,7 @@ Les deux agents chargent les mêmes `SKILL.md` ; seule la syntaxe d'invocation e
 | Double-check d'un finding | `/performance double-check PERF-001` | `$performance double-check PERF-001` |
 | Un cycle performance autonome | `/performance-cycle` | `$performance-cycle lance un cycle` |
 | Plusieurs cycles performance | `/performance-cycle 5` | `$performance-cycle lance 5 cycles` |
+| Cycles performance sans clôture documentaire | `/performance-cycle 5 --no-doc-cleanup` | `$performance-cycle lance 5 cycles sans doc-cleanup` |
 | Nettoyage ciblé | `/doc-cleanup src/api` | `$doc-cleanup nettoie src/api` |
 | Fichiers touchés dans la session | `/doc-cleanup session` | `$doc-cleanup nettoie les fichiers touchés` |
 | Liste explicite de fichiers | `/doc-cleanup session --files src/a.ts src/b.ts` | `$doc-cleanup session sur src/a.ts et src/b.ts uniquement` |

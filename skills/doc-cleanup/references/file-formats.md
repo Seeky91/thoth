@@ -8,7 +8,7 @@ Référence chargée quand un mode écrit l'état ou produit une sortie chat.
 
 ### Pourquoi markdown, pourquoi un seul fichier
 
-L'état est en markdown (lisible, git-diffable, éditable à la main) et **minimal par choix** : le livrable du skill est le *code nettoyé*, pas un registre de findings. Le ledger ne sert qu'à **deux choses** — savoir où reprendre une campagne (couverture par zone) et garder une trace datée des passes. Pas de findings, pas d'IDs, pas de cycle de vie : ne pas réintroduire la machinerie de `maintainability` ici.
+L'état est en markdown (lisible, git-diffable, éditable à la main) et **minimal par choix** : le livrable du skill est le *code nettoyé*, pas un registre de findings. Le ledger ne sert qu'à **deux choses** — savoir où reprendre une campagne (couverture par zone) et garder une trace datée des passes.
 
 ### Format
 
