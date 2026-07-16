@@ -2,14 +2,6 @@
 
 Référence normative pour l'état performance sous `<STATE_DIR>`. Conserver le Markdown : lisible, diffable et éditable à la main. Relire chaque fichier juste avant écriture et appliquer uniquement le delta ciblé.
 
-## Sommaire
-
-- `performance_history.md`
-- `performance_findings.md`
-- `performance_resolved_archive.md`
-- Compteur d'IDs
-- Cycle de vie
-
 ## `performance_history.md`
 
 Journal append-only, nouvelle ligne préfixée en tête :

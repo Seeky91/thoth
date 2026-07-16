@@ -2,16 +2,6 @@
 
 Référence chargée par SKILL.md au début de **chaque** mode. C'est le cœur du skill : la calibration de ce qu'on supprime, renomme, ou garde. À lire avant tout edit.
 
-## Sommaire
-
-- Posture agressive
-- Heuristique centrale
-- SUPPRIMER
-- RENOMMER
-- GARDER et dé-drifter
-- Garde-fous
-- Doc-comment privé vs contrat public
-
 ## Posture : agressif par défaut
 
 Un agent compétent **sous-supprime spontanément**. Laissé à lui-même, il garde « au cas où », trouve une justification à presque chaque commentaire, et le code reste noyé. Ce skill corrige ce biais en **inversant la charge de la preuve** :

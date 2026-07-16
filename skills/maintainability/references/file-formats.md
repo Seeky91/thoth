@@ -2,14 +2,6 @@
 
 Référence chargée par SKILL.md quand le skill doit lire ou écrire un fichier d'état. Trois fichiers vivent dans le `<STATE_DIR>` résolu par SKILL.md. Format strict, à respecter à la lettre.
 
-## Sommaire
-
-- Historique : `maintainability_history.md`
-- Findings actifs et résolus récents : `maintainability_findings.md`
-- Archive : `maintainability_resolved_archive.md`
-- Compteurs d'IDs
-- Cycle de vie d'un finding
-
 ### Pourquoi markdown (choix délibéré)
 
 L'état est en **markdown**, pas en JSON/binaire, **par choix** : lisible directement, **git-diffable** (chaque audit/résolution est un diff revue-able), et **éditable à la main** par l'utilisateur (le skill assume et anticipe cette édition — cf. *Compteur d'IDs > header absent* et la non-réutilisation d'ID après suppression manuelle). Un format opaque gagnerait un peu de robustesse de parsing mais perdrait ces trois propriétés, mauvais compromis pour un outil dont l'état doit rester inspectable. La robustesse de parsing est obtenue autrement : schéma de bullets stable (ci-dessous), écritures en delta (*SKILL.md > Conventions transverses*), et self-heal des compteurs.
@@ -73,7 +65,7 @@ Ces lignes sont **filtrées différemment** selon l'usage :
 - **Rolling actif zonal** et **couverture historique zonale** (usages 1 et 2 ci-dessus) : ignorent les lignes `crosscut:*`. Le rolling zonal ne consomme pas de slot quand un crosscut est exécuté.
 - **Rolling crosscut** (nouvel usage) : ne lit **que** les lignes `crosscut:*`, extrait `<DIM>`, conserve les `Nx = 6` plus récentes pour exclure ces dimensions du prochain crosscut auto. Override possible via `<!-- crosscut_rolling_size: M -->` en tête de fichier.
 
-`Nx = 6` est fixé en dur (contrairement au `N` zonal qui est calculé sur la taille de l'inventaire). C'est précisément le nombre de dimensions éligibles par défaut (`DUP`, `INC`, `DRF`, `DED`, `BND`, `ARC`) — le rolling se remplit après 6 crosscut, puis le cas dégénéré "toutes dans le rolling" (cf. `references/mode-crosscut.md > B`) prend la moins récemment crosscutée. Effet net : un round-robin naturel et prévisible sur les 6 dimensions, plutôt qu'un aléatoire pondéré qui revient deux fois sur la même dimension sur une fenêtre courte.
+`Nx = 6` est fixé en dur (contrairement au `N` zonal, calculé sur la taille de l'inventaire) : c'est précisément le nombre de dimensions éligibles par défaut, d'où un round-robin naturel et prévisible une fois le rolling plein — plutôt qu'un aléatoire pondéré qui reviendrait deux fois sur la même dimension à court terme (mécanisme : cf. `references/mode-crosscut.md > B`).
 
 ## `<STATE_DIR>/maintainability_findings.md`
 

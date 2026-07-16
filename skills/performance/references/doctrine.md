@@ -2,18 +2,6 @@
 
 Référence normative à lire avant tout audit, double-check, update ou fix. Elle définit ce qui mérite un finding `PERF`, comment mesurer et comment empêcher une optimisation de dégrader gratuitement le code.
 
-## Sommaire
-
-- Contrat du workload
-- Hiérarchie de preuve
-- Hypothèses, exposition et matérialité
-- Mesures comparables
-- Axes et sévérité
-- Quand ne pas produire de finding
-- Garde-fou de maintenabilité
-- Choix des outils
-- Workloads client et navigateur
-
 ## Contrat du workload
 
 Toute conclusion porte sur un workload explicite, jamais sur « le programme » en général. Décrire au minimum :

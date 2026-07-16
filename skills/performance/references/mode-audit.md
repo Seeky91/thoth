@@ -2,18 +2,6 @@
 
 Référence chargée en mode **audit auto**, **audit path** ou **audit feature**. Lire d'abord `references/doctrine.md`, puis `references/file-formats.md` avant toute écriture.
 
-## Sommaire
-
-- Bootstrap
-- Inventaire, triage de matérialité et sélection automatique
-- Audit ciblé par path
-- Audit ciblé par feature
-- Plan de mesure
-- Exécution
-- Production et écriture des findings
-- Sortie
-- Invariants
-
 ## Bootstrap
 
 Si l'état performance n'existe pas :

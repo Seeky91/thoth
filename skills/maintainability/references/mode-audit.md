@@ -2,19 +2,6 @@
 
 Référence chargée par SKILL.md en mode **audit auto** ou **audit forcé** avec un chemin. Les conventions transverses (date déterministe, écritures en delta) et la doctrine d'évaluation vivent dans SKILL.md et s'appliquent ici.
 
-## Sommaire
-
-- A. Bootstrap
-- B. Inventaire des zones
-- C. Sélection automatique
-- D. Audit forcé
-- E. Exécution
-- F. Écritures
-- G. Sortie en chat
-- H. Proposition de double-check
-- I. Action post-proposition
-- Invariants de fin de mode
-
 ## A. Bootstrap (si `<STATE_DIR>/maintainability_*.md` absent)
 
 1. Si `<STATE_DIR>` n'existe pas dans le projet : créer le dossier.
@@ -27,7 +14,7 @@ Référence chargée par SKILL.md en mode **audit auto** ou **audit forcé** ave
 
 Calculer à chaque audit (jamais persisté). Algorithme :
 
-0. **Outil de comptage opportuniste (optionnel, dégradation gracieuse).** Avant la marche manuelle, tester `command -v scc || command -v tokei`. Si présent, l'**exécuter en JSON par fichier** (`scc --by-file -f json` ou `tokei -o json`) et en dériver l'inventaire : les outils donnent les LoC de **code réelles** (hors commentaires/blank), par fichier et par langage, en excluant nativement le vendored — exactement le découpage et la chasse aux god files recherchés ci-dessous, en un appel, sans lire le code (c'est la sortie qui entre en contexte, pas les fichiers). **Si aucun n'est présent** : repli sur la marche manuelle (étapes 1-6). L'outil n'est jamais une dépendance dure ; il remplace seulement l'estimation manuelle quand il est là. La détection des landmarks architecturaux (étape 5) reste à faire même si le comptage vient d'un outil : elle dépend du rôle des fichiers/symboles, pas seulement de leur taille.
+0. **Outil de comptage opportuniste (optionnel, dégradation gracieuse).** Avant la marche manuelle, tester `command -v scc || command -v tokei`. Si présent, l'**exécuter en JSON par fichier** (`scc --by-file -f json` ou `tokei -o json`) et en dériver l'inventaire : les outils donnent les LoC de **code réelles** (hors commentaires/blank), par fichier et par langage, en excluant nativement le vendored, sans lire le code (c'est la sortie qui entre en contexte, pas les fichiers). **Si aucun n'est présent** : repli sur la marche manuelle (étapes 1-6) — l'outil n'est jamais une dépendance dure. La détection des landmarks architecturaux (étape 5) reste à faire même si le comptage vient d'un outil : elle dépend du rôle des fichiers/symboles, pas seulement de leur taille.
 1. **Walk de l'arbo** depuis la racine du projet.
 2. **Pour chaque dossier**, mesurer le total LoC source (exclure `.json`, `.toml`, `.lock`, `.md`, dossiers `node_modules`, `.git`, `dist`, `build`, `vendor`, `target`, `.venv`, et tout ce qui ressemble à du généré).
 3. **Règles de découpage** :
@@ -67,7 +54,7 @@ L'historique sert **trois usages distincts** qui ont des horizons de mémoire di
 9. **Annonce en chat** : utiliser le template `selection:proposition` (cf. `references/templates.md`). Le `<motif>` reflète à la fois la couverture (`jamais auditée`, `god file`, `pipeline traçable`, `landmark architectural`) et le signal d'activité (`chaude — <N> commits depuis le dernier audit`, `froide — auditée le YYYY-MM-DD, aucune activité hors-maintainability depuis`).
 10. **Validation utilisateur** : accepter, demander une alternative listée, ou imposer un autre chemin. Attendre avant de lancer l'audit.
 
-**Pourquoi cette séparation** : trimmer history (ancien comportement) faisait perdre la couverture historique. Sur gros projet (40+ zones), après 11+ audits, des zones réellement auditées sortaient du fichier et redevenaient « jamais auditées » du point de vue de la pondération — le skill re-proposait alors des zones déjà couvertes. History est désormais append-only ; le rolling est une vue sur les `N` premières lignes, la couverture est sur le fichier entier, et le signal d'activité prévient le second mode de bouclage (rester collé aux mêmes quelques zones non-rolling sur un gros projet où l'aléatoire pondéré seul ne suffit pas à pousser vers les zones effectivement modifiées).
+**Pourquoi cette séparation** : trimmer history (ancien comportement) faisait perdre la couverture historique et re-proposer des zones déjà couvertes (détail : `references/file-formats.md > Pourquoi append-only`). History est désormais append-only ; le rolling est une vue sur les `N` premières lignes, la couverture est sur le fichier entier, et le signal d'activité prévient le second mode de bouclage : rester collé aux mêmes quelques zones non-rolling sur un gros projet où l'aléatoire pondéré seul ne suffit pas à pousser vers les zones effectivement modifiées.
 
 ### Signal d'activité
 
@@ -115,7 +102,7 @@ Croise les modifications réelles du code (commits utilisateur) avec l'historiqu
 Pour la zone validée :
 
 1. **Lire le code de la zone** intégralement (tous les fichiers source dans le scope).
-1bis. **Indices outillés (optionnel, dégradation gracieuse).** Avant l'examen au jugement, si des outils de détection déterministes sont présents dans l'environnement, les exécuter sur la zone pour obtenir des candidats précis et localisés (duplication, exports morts, complexité, god files). Cf. `references/dimensions.md > Outils de détection opportunistes` pour la cartographie outil↔dimension et la posture (l'outil fournit le **rappel et la localisation** ; l'agent garde le **jugement** — produire ou non le finding, sévérité, trade-off check). **Aucune dépendance dure** : outil absent → repli sur la lecture/jugement de l'étape 2. L'outil ne décide jamais à la place de l'agent.
+1bis. **Indices outillés (optionnel, dégradation gracieuse).** Avant l'examen au jugement, si des outils de détection déterministes sont présents dans l'environnement, les exécuter sur la zone pour obtenir des candidats précis et localisés (duplication, exports morts, complexité, god files). Cf. `references/dimensions.md > Outils de détection opportunistes` pour la cartographie outil↔dimension et la posture (l'outil fournit le **rappel et la localisation** ; l'agent garde le **jugement** — produire ou non le finding, sévérité, trade-off check). **Aucune dépendance dure** : outil absent → repli sur la lecture/jugement de l'étape 2.
 1ter. **Frontière d'imports (pour `ARC`).** L'audit zonal lit la zone, mais le couplage ne se voit qu'à sa frontière : compléter par les imports entrants/sortants de la zone (`rg` des imports, ou graphe si outil présent), **sans lecture intégrale hors zone**. La cohésion (feature envy, sur-fragmentation, abstraction locale) se juge ici ; le couplage profond inter-zones (cycles, co-change, instabilité × churn) relève du crosscut `ARC` (cf. `references/dimensions.md > Cadrage de la dimension ARC`).
 1quater. **Lentille composition root / niveau d'abstraction (pour `ARC`).** Si la zone contient un landmark architectural (cf. `B.5`), examiner les composition roots qu'elle possède — pas seulement l'entrypoint applicatif, aussi les roots locales de sous-systèmes. Cf. `references/dimensions.md > Composition roots et niveau d'abstraction` pour le principe (niveau d'abstraction uniforme), la barre de friction concrète exigée, et la reco bornée (constructeur/factory possédé par le sous-système, anti-wrappers).
 2. **Examiner systématiquement toutes les dimensions** du catalogue (cf. `references/dimensions.md`). Pour chacune :

@@ -81,7 +81,7 @@ Ces règles s'appliquent à **chaque** mode, elles ne sont pas répétées dans 
 
 ## Doctrine — à charger avant tout nettoyage
 
-`references/doctrine.md` **doit** être lue au début de chaque mode. Elle porte la calibration qui fait ou défait le skill : la posture agressive par défaut (un agent compétent *sous-supprime* spontanément), l'heuristique de tri, et les garde-fous qui évitent que l'agressivité ne détruise les 10 % de commentaires utiles. Aucun mode ne produit d'edit sans l'avoir chargée.
+`references/doctrine.md` **doit** être lue au début de chaque mode : elle porte la calibration qui fait ou défait le skill (cf. son descriptif dans *Références*). Aucun mode ne produit d'edit sans l'avoir chargée.
 
 ## Sorties chat — conventions
 

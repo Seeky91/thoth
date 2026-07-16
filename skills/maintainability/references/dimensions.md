@@ -2,15 +2,6 @@
 
 Référence chargée par SKILL.md à l'exécution d'un audit ou d'un crosscut, pour cadrer ce qui constitue un finding sur chaque axe.
 
-## Sommaire
-
-- Seed des dimensions et frontières
-- Outils de détection opportunistes
-- Référentiel paradigmatique
-- Cadrage IDM
-- Cadrage ARC
-- Cadrage CPX
-
 ## Seed des dimensions
 
 12 dimensions de départ. **Ce n'est pas une grille fermée** : si un problème de maintenabilité réel ne colle à aucune, **invente un nouveau préfixe 3 lettres** (ex. `LOG-` pour sprawl de logging, `RAC-` pour patterns concurrents). La rigueur est sur l'observation factuelle, pas sur l'étiquetage.

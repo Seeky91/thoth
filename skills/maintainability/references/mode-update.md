@@ -39,7 +39,7 @@ Utiliser le template `update:summary`.
 
 ## Coût
 
-Cette commande lit potentiellement beaucoup de fichiers (un par pending), plus les appels d'investigation self-heal sur les pendings dont le fichier est introuvable (git history, grep codebase, lecture de diffs ciblés). Acceptable car invocation rare et explicite — pas appelée à chaque audit. Le coût self-heal est proportionnel au nombre de stales rencontrés, pas au total des pendings.
+Lectures potentiellement nombreuses (une par pending, plus l'investigation self-heal par stale rencontré — proportionnelle aux stales, pas au total des pendings). Acceptable : invocation rare et explicite, pas appelée à chaque audit.
 
 ## Détection intra-session
 
